@@ -53,6 +53,7 @@ npm run build
 
 - For real-ROM local testing, a dev-only URL loader exists:
   - `/?romUrl=/roms/pokemon-platinum.nds&romName=pokemon-platinum.nds`
+  - this assumes the ROM is being served locally by the developer; do not commit a `public/roms` symlink or copied ROMs
 - Real Platinum boot/input has been validated in-browser.
 - Still explicitly unverified enough to keep on the todo list:
   - real save creation plus `.sav` round-trip

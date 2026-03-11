@@ -26,3 +26,5 @@ platinum-*.png
 *.njsproj
 *.sln
 *.sw?
+
+public/roms
