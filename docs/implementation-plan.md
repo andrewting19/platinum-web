@@ -2,7 +2,7 @@
 
 ## Product Goal
 
-Build a mobile-first browser app that makes a legally dumped copy of `Pokemon Platinum` comfortable to play on a phone without bundling copyrighted ROM data. The app should behave like an installable web app, run fully client-side, and prioritize reliability for long play sessions.
+Build a mobile-first browser app that makes `Pokemon Platinum` comfortable to play on a phone without bundling ROM data into the repository. The app should behave like an installable web app, run fully client-side, and prioritize reliability for long play sessions.
 
 ## Why This Architecture
 
@@ -11,7 +11,7 @@ We are not porting the game. We are building a web shell around a browser-compat
 - Emulator core: vendor the published `ds-anywhere` runtime assets (`wasmemulator.js`, `wasmemulator.wasm`, `webmelon.js`) locally for reproducible builds and offline caching.
 - Frontend stack: `Vite + React + TypeScript` to keep iteration fast while giving us enough structure for emulator state, controls, save UX, and PWA support.
 - Storage model:
-  - ROMs are user-supplied through the browser file picker and loaded into the virtual filesystem at runtime.
+  - ROMs are loaded through the browser file picker and into the virtual filesystem at runtime.
   - Save files are persisted in `IndexedDB` via the emulator's `IDBFS` bridge.
   - Save export/import is handled manually so users can back up progress outside browser storage.
 - Delivery: PWA-enabled build so the app is installable on phone home screens and can keep emulator assets available offline.
@@ -131,7 +131,7 @@ Mitigation: isolate those accesses in one adapter module so we can swap them if 
 
 ### Full Game Validation
 
-Risk: we cannot bundle commercial ROMs for testing.
+Risk: we cannot keep real game ROMs in the repository for testing.
 
 Mitigation: validate runtime boot, stage rendering, save filesystem behavior, and ROM import pathing separately; leave live game validation to user-supplied dumps.
 

@@ -4,8 +4,6 @@ This repository is for a mobile-first Nintendo DS browser shell tuned around `Po
 
 ## Working Assumptions
 
-- Do not add or distribute copyrighted ROMs, BIOS files, or download links.
-- User-supplied ROMs are the only acceptable cartridge source.
 - Current emulator runtime is vendored under `public/static/`; rebuilding it from source is a follow-up task, not a baseline requirement.
 - The app is intentionally PWA-first and phone-first. Changes should be verified in a narrow viewport, not only desktop.
 
@@ -53,7 +51,7 @@ npm run build
 
 - For real-ROM local testing, a dev-only URL loader exists:
   - `/?romUrl=/roms/pokemon-platinum.nds&romName=pokemon-platinum.nds`
-  - this assumes the ROM is being served locally by the developer; do not commit a `public/roms` symlink or copied ROMs
+  - this assumes the ROM is being served locally by the developer; do not commit a `public/roms` symlink or copied local assets
 - Real Platinum boot/input has been validated in-browser.
 - Still explicitly unverified enough to keep on the todo list:
   - real save creation plus `.sav` round-trip
@@ -75,4 +73,4 @@ npm run build
 - Before publishing, confirm:
   - repo remote is set
   - Pages is enabled for GitHub Actions
-  - no ROMs or local artifacts are tracked
+  - no local-only assets are tracked

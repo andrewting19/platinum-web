@@ -13,7 +13,7 @@
 - [x] Create utilities for ROM naming, save naming, and file formatting.
 - [x] Build a runtime hook that tracks SDK readiness and storage readiness.
 - [x] Mount and prepare emulator storage directories.
-- [x] Add ROM import flow with legal-safe messaging.
+- [x] Add ROM import flow messaging.
 - [x] Add explicit audio unlock during emulator start.
 - [x] Create the dual-screen emulator stage.
 - [x] Start emulation after ROM import and stage readiness.
@@ -36,7 +36,7 @@
 - [x] Add installable PWA metadata and icons.
 - [x] Verify the app builds cleanly.
 - [x] Verify the app loads in a phone-sized browser viewport.
-- [x] Verify import, status, and control behavior manually with a real legal ROM dump.
+- [x] Verify import, status, and control behavior manually with a real ROM dump.
 - [x] Update docs with usage notes and constraints.
 - [x] Clean up generated scaffold leftovers.
 - [ ] Verify real save creation in Pokemon Platinum and confirm `.sav` export/import round-trip.
@@ -49,7 +49,7 @@
 - [ ] Check battery/thermal impact during longer sessions.
 - [ ] Evaluate whether the vendored runtime should be rebuilt from source for longer-term maintainability.
 - [ ] Decide whether to suppress or upstream the runtime's noisy `FS.syncfs` and ARM I/O console output.
-- [ ] Add end-to-end tests once a legal homebrew ROM fixture is available.
+- [ ] Add end-to-end tests once a repo-safe ROM fixture strategy is available.
 - [x] Convert repo documentation to agent-facing guidance and symlink `README.md` / `CLAUDE.md`.
 - [x] Initialize git repository and push to GitHub.
 - [x] Add GitHub Pages deployment workflow and verify a successful deploy.
