@@ -722,7 +722,7 @@ canvas {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 2px 12px;
+  padding: 6px 12px;
   flex-shrink: 0;
 }
 
