@@ -227,7 +227,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .face-section { grid-area: face; display: flex; align-items: center; justify-content: center; }
 
 /* ========================================
-   D-PAD
+   D-PAD — sculpted cross with depth
    ======================================== */
 
 .dpad-container {
@@ -243,10 +243,14 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .dpad-cross::after {
   content: '';
   position: absolute;
-  background: var(--btn-surface);
+  background: linear-gradient(180deg, #32363e 0%, var(--btn-surface) 40%, #22252c 100%);
   border: 1px solid var(--btn-border);
   border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px var(--btn-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 3px 10px var(--btn-shadow),
+    0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .dpad-cross::before { top: 33.3%; left: 0; right: 0; height: 33.4%; }
@@ -256,12 +260,13 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: var(--shell-light);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: radial-gradient(circle, #363940 0%, var(--shell-light) 60%, #1e2028 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(0, 0, 0, 0.15);
   z-index: 3;
   pointer-events: none;
 }
@@ -282,7 +287,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .dpad-zone.right { top: 33.3%; right: 0; width: 33.3%; height: 33.4%; border-radius: 0 8px 8px 0; }
 
 /* ========================================
-   FACE BUTTONS — diamond layout
+   FACE BUTTONS — diamond layout with wells
    ======================================== */
 
 .face-container {
@@ -297,9 +302,13 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   width: calc(44px * var(--control-scale));
   height: calc(44px * var(--control-scale));
   border-radius: 50%;
-  background: linear-gradient(180deg, var(--btn-surface) 0%, #1e2028 100%);
+  background: linear-gradient(180deg, #34383f 0%, var(--btn-surface) 35%, #1e2028 100%);
   border: 1px solid var(--btn-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 10px var(--btn-shadow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 3px 8px var(--btn-shadow),
+    0 1px 2px rgba(0, 0, 0, 0.3);
   font-family: 'JetBrains Mono', monospace;
   font-size: calc(0.75rem * var(--control-scale));
   font-weight: 500;
@@ -316,7 +325,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .face-btn:active {
   transform: translate(-50%, -50%) scale(0.92);
   background: var(--btn-surface-pressed);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 1px 2px var(--btn-shadow);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px var(--btn-shadow);
 }
 
 .face-btn.x-btn { top: 8%; left: 50%; }
@@ -334,7 +343,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 }
 
 /* ========================================
-   UTILITY ROW — Start, Select
+   UTILITY ROW — Start, Select (recessed)
    ======================================== */
 
 .utility-row {
@@ -350,8 +359,12 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   height: calc(28px * var(--control-scale));
   padding: 0 14px;
   border-radius: 14px;
-  background: var(--shell-light);
-  border: 1px solid var(--btn-border);
+  background: linear-gradient(180deg, #1e2128 0%, #22252d 100%);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 1px 0 rgba(255, 255, 255, 0.03);
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.6rem;
   font-weight: 500;
@@ -363,7 +376,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   touch-action: none;
 }
 
-.pill-btn:active { transform: scale(0.95); background: var(--btn-surface-pressed); }
+.pill-btn:active { transform: scale(0.95); background: #181b20; }
 
 /* ========================================
    STATUS BAR
@@ -550,21 +563,22 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 
 @media (min-width: 700px) {
   /* Both screens use the SAME width, computed from viewport height.
-     Budget: 2 screens (each W × 0.75) + shoulder(34) + hinge(12) + utility(34) + status(18) + padding(62) = 160px chrome
-     → W = min(480px, (100dvh - 160px) / 1.5)  */
+     Budget: 2 screens (each W × 0.75) + shoulder(30) + hinge(12) + utility(30) + status(18) + padding(50) = 140px chrome
+     → W = min(480px, (100dvh - 140px) / 1.5)  */
   :root {
-    --screen-w: min(480px, calc((100dvh - 160px) / 1.5));
+    --screen-w: min(480px, calc((100dvh - 140px) / 1.5));
   }
 
+  /* [POLISH 6] Ambient lighting — desk lamp vignette behind the device */
   body {
-    background: #0b0d10;
+    background: #08090c;
     background-image:
-      radial-gradient(ellipse at 50% 40%, rgba(30, 35, 48, 0.6) 0%, transparent 70%),
-      radial-gradient(ellipse at 50% 100%, rgba(15, 18, 25, 0.4) 0%, transparent 50%);
+      radial-gradient(ellipse 80% 60% at 50% 35%, rgba(40, 48, 65, 0.5) 0%, transparent 100%),
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(50, 60, 80, 0.15) 0%, transparent 100%),
+      radial-gradient(ellipse at 50% 100%, rgba(0, 0, 0, 0.4) 0%, transparent 50%);
   }
 
   .dsi-shell {
-    /* Shell width = screen + controls + padding. Sized from screen. */
     max-width: calc(var(--screen-w) + 320px);
     margin: 0 auto;
     background: transparent;
@@ -573,19 +587,25 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 
   .dsi-shell::before { display: none; }
 
-  /* ── Top shell ── */
+  /* ── Top shell — tight wrap around screen ── */
   .top-shell {
     background-color: #1c1f24;
     background-image:
       url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
     background-size: 100px;
+    /* [POLISH 7] Shell edge bevel — left/right highlight for 3D plastic feel */
     border: 1px solid rgba(255, 255, 255, 0.05);
+    border-left-color: rgba(255, 255, 255, 0.07);
+    border-right-color: rgba(255, 255, 255, 0.03);
     border-bottom: none;
     border-radius: 18px 18px 2px 2px;
-    padding: 0 20px 8px;
+    /* [POLISH 1] Tighter padding so screen fills more of the shell */
+    padding: 0 16px 6px;
     position: relative;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset -1px 0 0 rgba(0, 0, 0, 0.1),
+      inset 1px 0 0 rgba(255, 255, 255, 0.02),
       0 -4px 30px rgba(0, 0, 0, 0.3);
   }
 
@@ -593,7 +613,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   .top-shell::after {
     content: '';
     position: absolute;
-    top: 38px;
+    top: 36px;
     left: 50%;
     transform: translateX(-50%);
     width: 6px;
@@ -605,11 +625,29 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
     z-index: 5;
   }
 
+  /* [POLISH 4] Shoulder buttons — tapered 3D shape */
   .top-shell .shoulder-bar { padding-top: 2px; }
-  .top-shell .shoulder-btn { flex: 0 0 110px; height: 28px; font-size: 0.6rem; }
+  .top-shell .shoulder-btn {
+    flex: 0 0 110px;
+    height: 26px;
+    font-size: 0.58rem;
+    background: linear-gradient(180deg, #3a3e47 0%, #2e3139 30%, var(--btn-surface) 100%);
+    box-shadow:
+      0 4px 10px rgba(0, 0, 0, 0.5),
+      0 1px 2px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+    border-radius: 0 0 12px 0;
+    border-width: 1px;
+    border-style: solid;
+    border-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.04) rgba(255, 255, 255, 0.03) transparent;
+  }
+  .top-shell .shoulder-btn:first-child { border-radius: 0 0 12px 0; border-left: none; }
+  .top-shell .shoulder-btn:last-child { border-radius: 0 0 0 12px; border-right: none; }
+
   .top-shell .screen-bezel { max-width: var(--screen-w); }
 
-  /* ── Hinge ── */
+  /* ── Hinge — refined seam ── */
   .hinge {
     max-width: none;
     height: 12px;
@@ -651,10 +689,13 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
     background-image:
       url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
     background-size: 100px;
+    /* [POLISH 7] Edge bevel on bottom shell too */
     border: 1px solid rgba(255, 255, 255, 0.05);
+    border-left-color: rgba(255, 255, 255, 0.07);
+    border-right-color: rgba(255, 255, 255, 0.03);
     border-top: none;
     border-radius: 2px 2px 18px 18px;
-    padding: 12px 16px 12px;
+    padding: 10px 14px 10px;
     grid-template-columns: 1fr auto 1fr;
     grid-template-rows: 1fr auto auto;
     grid-template-areas:
@@ -663,20 +704,22 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
       "status status status";
     align-items: center;
     justify-items: center;
-    gap: 4px 10px;
+    gap: 4px 8px;
     position: relative;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      inset -1px 0 0 rgba(0, 0, 0, 0.1),
+      inset 1px 0 0 rgba(255, 255, 255, 0.02),
       0 8px 40px rgba(0, 0, 0, 0.5),
       0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
-  /* Speaker grilles — refined dot pattern */
+  /* Speaker grilles */
   .bottom-shell::before,
   .bottom-shell::after {
     content: '';
     position: absolute;
-    bottom: 14px;
+    bottom: 12px;
     width: 36px;
     height: 12px;
     background-image: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0.8px, transparent 0.8px);
@@ -684,17 +727,50 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
     pointer-events: none;
     z-index: 2;
   }
-  .bottom-shell::before { left: 20px; }
-  .bottom-shell::after { right: 20px; }
+  .bottom-shell::before { left: 18px; }
+  .bottom-shell::after { right: 18px; }
 
   /* Both screens: same size */
   .bottom-screen-wrapper .screen-bezel { width: var(--screen-w); max-width: var(--screen-w); }
 
-  /* Controls sized relative to screen — compact but usable */
+  /* [POLISH 2] D-pad — sculpted with circular recess in shell */
+  .dpad-section { position: relative; }
+  .dpad-section::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
   .dpad-container { width: calc(120px * var(--control-scale)); height: calc(120px * var(--control-scale)); }
+
+  /* [POLISH 3] Face buttons — circular well behind the diamond */
+  .face-section { position: relative; }
+  .face-section::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
   .face-container { width: calc(120px * var(--control-scale)); height: calc(120px * var(--control-scale)); }
   .face-btn { width: calc(44px * var(--control-scale)); height: calc(44px * var(--control-scale)); font-size: calc(0.8rem * var(--control-scale)); }
-  .pill-btn { height: 26px; padding: 0 16px; font-size: 0.6rem; }
+
+  /* [POLISH 5] Select/Start — recessed slot look */
+  .pill-btn {
+    height: 24px;
+    padding: 0 14px;
+    font-size: 0.55rem;
+    background: linear-gradient(180deg, #181b20 0%, #1e2128 100%);
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    box-shadow:
+      inset 0 1px 4px rgba(0, 0, 0, 0.35),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+      0 1px 0 rgba(255, 255, 255, 0.04);
+    color: rgba(232, 234, 237, 0.35);
+  }
 
   .menu-toggle {
     position: fixed; top: 16px; right: 16px;
@@ -716,7 +792,10 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   .welcome-actions { max-width: 260px; }
 
   /* Bezel refinements for desktop */
-  .screen-bezel { border-color: rgba(255, 255, 255, 0.05); }
+  .screen-bezel {
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  }
   .screen-bezel::after {
     box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.7);
   }
@@ -725,17 +804,17 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 /* ── Extra-large screens (1200px+) — slightly more generous ── */
 @media (min-width: 1200px) {
   :root {
-    --screen-w: min(500px, calc((100dvh - 170px) / 1.5));
+    --screen-w: min(500px, calc((100dvh - 150px) / 1.5));
   }
 
   .dsi-shell { max-width: calc(var(--screen-w) + 350px); margin: 20px auto; height: calc(100dvh - 40px); }
-  .top-shell { border-radius: 22px 22px 2px 2px; padding: 0 24px 10px; }
-  .bottom-shell { border-radius: 2px 2px 22px 22px; padding: 14px 20px 14px; gap: 6px 14px; }
+  .top-shell { border-radius: 22px 22px 2px 2px; padding: 0 20px 8px; }
+  .bottom-shell { border-radius: 2px 2px 22px 22px; padding: 12px 18px 12px; gap: 6px 12px; }
 
   .dpad-container { width: calc(130px * var(--control-scale)); height: calc(130px * var(--control-scale)); }
   .face-container { width: calc(130px * var(--control-scale)); height: calc(130px * var(--control-scale)); }
   .face-btn { width: calc(48px * var(--control-scale)); height: calc(48px * var(--control-scale)); }
-  .pill-btn { height: 28px; padding: 0 18px; }
+  .pill-btn { height: 26px; padding: 0 16px; }
 }
 
 /* ========================================
