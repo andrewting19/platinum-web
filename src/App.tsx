@@ -81,11 +81,11 @@ function App() {
   const saveInputRef = useRef<HTMLInputElement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [controlScale, setControlScale] = useState(() => {
-    const saved = window.localStorage.getItem('platinum-web:control-scale')
+    const saved = window.localStorage.getItem('pokemon:control-scale')
     return saved ? Number(saved) : 1
   })
   const [controlOpacity, setControlOpacity] = useState(() => {
-    const saved = window.localStorage.getItem('platinum-web:control-opacity')
+    const saved = window.localStorage.getItem('pokemon:control-opacity')
     return saved ? Number(saved) : 0.92
   })
 
@@ -112,11 +112,11 @@ function App() {
   } = useEmulator()
 
   useEffect(() => {
-    window.localStorage.setItem('platinum-web:control-scale', String(controlScale))
+    window.localStorage.setItem('pokemon:control-scale', String(controlScale))
   }, [controlScale])
 
   useEffect(() => {
-    window.localStorage.setItem('platinum-web:control-opacity', String(controlOpacity))
+    window.localStorage.setItem('pokemon:control-opacity', String(controlOpacity))
   }, [controlOpacity])
 
   // LED status

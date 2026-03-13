@@ -27,7 +27,7 @@ export interface RememberedRom {
 
 export const ROM_DIRECTORY = '/roms'
 export const SAVE_DIRECTORY = '/savefiles'
-export const LAST_ROM_STORAGE_KEY = 'platinum-web:last-rom'
+export const LAST_ROM_STORAGE_KEY = 'pokemon:last-rom'
 
 export function getWebMelon(): WebMelonInterface {
   if (!window.WebMelon) {
