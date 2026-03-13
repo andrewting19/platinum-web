@@ -100,13 +100,13 @@ function App() {
     saveBanner,
     session,
     rememberedRom,
+    romDownloadProgress,
     start,
     stop,
     togglePause,
     toggleFastForward,
     exportSave,
     importSave,
-    startFromUrl,
     resumeRememberedRom,
     forgetRememberedRom,
   } = useEmulator()
@@ -118,15 +118,6 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('platinum-web:control-opacity', String(controlOpacity))
   }, [controlOpacity])
-
-  // URL-based ROM loading
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const romUrl = params.get('romUrl')
-    if (!romUrl || !sdkReady || !storageReady || running) return
-    const romName = params.get('romName') ?? undefined
-    void startFromUrl(romUrl, romName)
-  }, [running, sdkReady, startFromUrl, storageReady])
 
   // LED status
   const ledClass = useMemo(() => {
@@ -151,59 +142,41 @@ function App() {
         } as CSSProperties
       }
     >
-      {/* Shoulder buttons */}
-      <div className="shoulder-bar">
-        <ShoulderButton button="L" label="L" />
-        <ShoulderButton button="R" label="R" />
-      </div>
-
-      {/* Screens */}
-      <div className="screens-area">
+      {/* ── Top clamshell half ── */}
+      <div className="top-shell">
+        <div className="shoulder-bar">
+          <ShoulderButton button="L" label="L" />
+          <ShoulderButton button="R" label="R" />
+        </div>
         <div className="screen-bezel top-bezel">
           {showWelcome && (
             <div className="welcome-overlay">
               <div className="welcome-title">Platinum Web</div>
               <div className="welcome-sub">Nintendo DS in your browser</div>
-              <div className="welcome-actions">
-                <button
-                  className="welcome-btn"
-                  disabled={!sdkReady || !storageReady}
-                  onClick={() => romInputRef.current?.click()}
-                >
-                  {sdkReady && storageReady ? 'Load ROM' : 'Initializing...'}
-                </button>
-                {rememberedRom && (
-                  <button
-                    className="welcome-btn ghost"
-                    onClick={() => resumeRememberedRom()}
-                  >
-                    Resume: {rememberedRom.fileName}
-                  </button>
-                )}
-              </div>
+              {romDownloadProgress !== null ? (
+                <div className="download-progress">
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${romDownloadProgress}%` }} />
+                  </div>
+                  <div className="progress-label">Downloading... {romDownloadProgress}%</div>
+                </div>
+              ) : (
+                <div className="welcome-sub">{status}</div>
+              )}
             </div>
           )}
           <canvas id="top-screen" width="256" height="192" />
         </div>
-
-        <div className="hinge">
-          <div className={ledClass} />
-        </div>
-
-        <div className="screen-bezel bottom-bezel">
-          <canvas id="bottom-screen" width="256" height="192" />
-        </div>
       </div>
 
-      {/* Minimal status */}
-      <div className="status-bar">
-        <span className="status-text">{status}</span>
+      {/* ── Hinge ── */}
+      <div className="hinge">
+        <div className={ledClass} />
       </div>
 
-      {/* Controls */}
-      <div className="controls-area">
-        {/* D-pad and Face buttons */}
-        <div className="button-row">
+      {/* ── Bottom clamshell half ── */}
+      <div className="bottom-shell">
+        <div className="dpad-section">
           <div className="dpad-container">
             <div className="dpad-cross" />
             <div className="dpad-center" />
@@ -212,7 +185,15 @@ function App() {
             <GameButton button="DPAD_LEFT" label="" className="dpad-zone left" />
             <GameButton button="DPAD_RIGHT" label="" className="dpad-zone right" />
           </div>
+        </div>
 
+        <div className="bottom-screen-wrapper">
+          <div className="screen-bezel bottom-bezel">
+            <canvas id="bottom-screen" width="256" height="192" />
+          </div>
+        </div>
+
+        <div className="face-section">
           <div className="face-container">
             <GameButton button="X" label="X" className="face-btn x-btn" />
             <GameButton button="Y" label="Y" className="face-btn y-btn" />
@@ -221,10 +202,13 @@ function App() {
           </div>
         </div>
 
-        {/* Select / Start / Screen toggle */}
         <div className="utility-row">
           <GameButton button="SELECT" label="Select" className="pill-btn" />
           <GameButton button="START" label="Start" className="pill-btn" />
+        </div>
+
+        <div className="status-bar">
+          <span className="status-text">{status}</span>
         </div>
       </div>
 

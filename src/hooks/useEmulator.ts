@@ -30,6 +30,9 @@ export interface SessionMeta {
   savePath: string
 }
 
+const BUNDLED_ROM_URL = 'https://pub-96d84523d8a341b79c022b2a33f1c324.r2.dev/pokemon-platinum.nds.gz'
+const BUNDLED_ROM_NAME = 'pokemon-platinum.nds'
+
 export function useEmulator() {
   const [sdkReady, setSdkReady] = useState(isRuntimeLoaded())
   const [storageReady, setStorageReady] = useState(false)
@@ -42,9 +45,11 @@ export function useEmulator() {
   const [saveBanner, setSaveBanner] = useState('No save activity yet.')
   const [session, setSession] = useState<SessionMeta | null>(null)
   const [rememberedRom, setRememberedRom] = useState<RememberedRom | null>(null)
+  const [romDownloadProgress, setRomDownloadProgress] = useState<number | null>(null)
   const saveBannerTimeout = useRef<number | null>(null)
   const bootstrappedRef = useRef(false)
   const pointerBridgeCleanupRef = useRef<(() => void) | null>(null)
+  const autoFetchAttemptedRef = useRef(false)
 
   const clearSaveTimer = () => {
     if (saveBannerTimeout.current !== null) {
@@ -254,6 +259,52 @@ export function useEmulator() {
     }
   }, [setTransientSaveBanner])
 
+  const fetchBundledRom = useCallback(async () => {
+    if (autoFetchAttemptedRef.current) return
+    autoFetchAttemptedRef.current = true
+
+    try {
+      setStatus('Downloading Pokemon Platinum...')
+      setRomDownloadProgress(0)
+
+      const response = await fetch(BUNDLED_ROM_URL)
+      if (!response.ok) throw new Error(`Download failed (${response.status})`)
+
+      const contentLength = Number(response.headers.get('Content-Length') || 0)
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Download stream unavailable')
+
+      const chunks: Uint8Array[] = []
+      let received = 0
+
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        received += value.byteLength
+        if (contentLength > 0) {
+          setRomDownloadProgress(Math.round((received / contentLength) * 100))
+        }
+      }
+
+      setStatus('Decompressing ROM...')
+      setRomDownloadProgress(null)
+
+      const compressed = new Blob(chunks as BlobPart[])
+      const ds = new DecompressionStream('gzip')
+      const decompressed = compressed.stream().pipeThrough(ds)
+      const decompressedBlob = await new Response(decompressed).blob()
+      const romData = new Uint8Array(await decompressedBlob.arrayBuffer())
+
+      await startBuffer(BUNDLED_ROM_NAME, romData.byteLength, romData)
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'ROM download failed'
+      setError(message)
+      setStatus('Could not auto-load ROM. Use the menu to import manually.')
+      setRomDownloadProgress(null)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const handleBlur = () => {
       releaseAllButtons()
@@ -361,7 +412,7 @@ export function useEmulator() {
     await startBuffer(file.name, file.size, fileData)
   }
 
-  const startFromUrl = async (url: string, fileName?: string) => {
+  const startFromUrl = useCallback(async (url: string, fileName?: string) => {
     const response = await fetch(url)
 
     if (!response.ok) {
@@ -375,7 +426,7 @@ export function useEmulator() {
       'remote.nds'
 
     await startBuffer(resolvedName, fileData.byteLength, fileData)
-  }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePause = () => {
     if (!window.WebMelon?.emulator.hasEmulator()) {
@@ -443,14 +494,40 @@ export function useEmulator() {
     setTransientSaveBanner('Save imported. Reload the ROM or continue after the next save flush.')
   }
 
-  const resumeRememberedRom = async () => {
+  const resumeRememberedRom = useCallback(async () => {
     if (!rememberedRom) {
       throw new Error('There is no cached ROM on this device.')
     }
 
     const romData = readVirtualFile(rememberedRom.romPath)
     await startBuffer(rememberedRom.fileName, rememberedRom.fileSize, romData)
-  }
+  }, [rememberedRom]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-load ROM when ready: cached ROM > URL param > bundled download
+  useEffect(() => {
+    if (!sdkReady || !storageReady || running) return
+    if (autoFetchAttemptedRef.current) return
+
+    // If there's a cached ROM, resume it
+    if (rememberedRom) {
+      autoFetchAttemptedRef.current = true
+      void resumeRememberedRom()
+      return
+    }
+
+    // If URL params specify a ROM, use that
+    const params = new URLSearchParams(window.location.search)
+    const romUrl = params.get('romUrl')
+    if (romUrl) {
+      autoFetchAttemptedRef.current = true
+      const romName = params.get('romName') ?? undefined
+      void startFromUrl(romUrl, romName)
+      return
+    }
+
+    // Otherwise, download the bundled ROM
+    void fetchBundledRom()
+  }, [sdkReady, storageReady, running, rememberedRom, fetchBundledRom, resumeRememberedRom, startFromUrl])
 
   const forgetRememberedRom = async () => {
     if (!rememberedRom) {
@@ -476,6 +553,7 @@ export function useEmulator() {
     saveBanner,
     session,
     rememberedRom,
+    romDownloadProgress,
     setScreenFocus,
     start,
     stop,
