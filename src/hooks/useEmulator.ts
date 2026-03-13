@@ -312,9 +312,20 @@ export function useEmulator() {
       releaseAllButtons()
     }
 
+    // Resume audio on first user interaction (Chrome autoplay policy)
+    const handleUserGesture = () => {
+      resumeAudioContext()
+      window.removeEventListener('pointerdown', handleUserGesture)
+      window.removeEventListener('keydown', handleUserGesture)
+    }
+
     window.addEventListener('blur', handleBlur)
+    window.addEventListener('pointerdown', handleUserGesture)
+    window.addEventListener('keydown', handleUserGesture)
     return () => {
       window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('pointerdown', handleUserGesture)
+      window.removeEventListener('keydown', handleUserGesture)
     }
   }, [])
 
@@ -374,7 +385,9 @@ export function useEmulator() {
       wm.emulator.loadFreeBIOS()
       wm.emulator.loadCart()
 
-      await resumeAudioContext()
+      // Don't block boot on audio — Chrome may reject without user gesture.
+      // Audio will resume on first user interaction instead.
+      resumeAudioContext()
 
       window.requestAnimationFrame(() => {
         wm.emulator.startEmulation('top-screen', 'bottom-screen')
