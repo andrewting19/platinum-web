@@ -1,4 +1,5 @@
 const CHEERPJ_LOADER_URL = 'https://cjrtnc.leaningtech.com/2.3/loader.js'
+const RANDOMIZER_DEBUG_KEY = 'pokemon:randomizer-debug'
 const EMULATOR_HEAP_GLOBAL_KEYS = [
   'HEAP8',
   'HEAP16',
@@ -62,6 +63,25 @@ let loaderPromise: Promise<void> | null = null
 let runtimePromise: Promise<void> | null = null
 let emulatorHeapGlobalsSnapshot: Partial<Record<(typeof EMULATOR_HEAP_GLOBAL_KEYS)[number], unknown>> | null = null
 
+interface RandomizerDebugState {
+  startedAt: string
+  updatedAt: string
+  phase: string
+  currentStep: string
+  completedSteps: string[]
+  error: string | null
+  preset: RandomizerPresetId
+  romName: string
+  romBytes: number
+  telemetry: {
+    moduleHeap8Length: number | null
+    windowHeap8Length: number | null
+    jsHeapLimit: number | null
+    usedJsHeapSize: number | null
+    totalJsHeapSize: number | null
+  }
+}
+
 export async function randomizeRom({
   romData,
   romName,
@@ -79,9 +99,15 @@ export async function randomizeRom({
       throw new Error('Unknown randomizer preset.')
     }
 
+    const debug = createRandomizerDebugState({
+      preset,
+      romName,
+      romBytes: romData.byteLength,
+    })
+
     onStatus?.('Preparing the browser randomizer...')
-    await ensureRuntimeReady()
-    await clearRandomizerStorage()
+    await runRandomizerStep(debug, 'ensure-runtime-ready', () => ensureRuntimeReady())
+    await runRandomizerStep(debug, 'clear-randomizer-storage', () => clearRandomizerStorage())
 
     if (!window.cheerpjAddStringFile || !window.cjNew || !window.cjCall || !window.cjFileBlob) {
       throw new Error('The browser randomizer API did not initialize correctly.')
@@ -96,39 +122,78 @@ export async function randomizeRom({
 
     onStatus?.(`Applying ${presetConfig.label}...`)
     onStatus?.('Loading preset settings...')
-    const settingsBytes = await loadPresetSettings(presetConfig.settingsPath)
-    window.cheerpjAddStringFile(settingsPath, settingsBytes)
-    window.cheerpjAddStringFile(mountedSourcePath, romData)
+    const settingsBytes = await runRandomizerStep(debug, 'fetch-preset-settings', () =>
+      loadPresetSettings(presetConfig.settingsPath),
+    )
+    await runRandomizerStep(debug, 'mount-preset-settings', () => {
+      window.cheerpjAddStringFile?.(settingsPath, settingsBytes)
+    })
+    await runRandomizerStep(debug, 'mount-source-rom', () => {
+      window.cheerpjAddStringFile?.(mountedSourcePath, romData)
+    })
 
-    const settingsStream = await window.cjNew('java.io.FileInputStream', settingsPath)
-    const javaSettings = await window.cjCall('com.dabomstew.pkrandom.Settings', 'read', settingsStream)
-    const customNames = await window.cjCall('com.dabomstew.pkrandom.FileFunctions', 'getCustomNames')
-    await window.cjCall(javaSettings, 'setCustomNames', customNames)
+    const settingsStream = await runRandomizerStep(debug, 'open-settings-file-stream', () =>
+      window.cjNew!('java.io.FileInputStream', settingsPath),
+    )
+    const javaSettings = await runRandomizerStep(debug, 'read-settings', () =>
+      window.cjCall!('com.dabomstew.pkrandom.Settings', 'read', settingsStream),
+    )
+    const customNames = await runRandomizerStep(debug, 'load-custom-names', () =>
+      window.cjCall!('com.dabomstew.pkrandom.FileFunctions', 'getCustomNames'),
+    )
+    await runRandomizerStep(debug, 'apply-custom-names', () =>
+      window.cjCall!(javaSettings, 'setCustomNames', customNames),
+    )
 
     onStatus?.('Preparing Java randomizer state...')
-    const sourceBytes = await window.cjCall('com.dabomstew.pkrandom.FileFunctions', 'readFileFullyIntoBuffer', mountedSourcePath)
-    await window.cjCall('com.dabomstew.pkrandom.FileFunctions', 'writeBytesToFile', workingSourcePath, sourceBytes)
-    const javaRandom = await window.cjNew('java.util.Random')
-    const romHandler = await window.cjNew('com.dabomstew.pkrandom.romhandlers.Gen4RomHandler', javaRandom)
+    const sourceBytes = await runRandomizerStep(debug, 'read-source-rom-buffer', () =>
+      window.cjCall!('com.dabomstew.pkrandom.FileFunctions', 'readFileFullyIntoBuffer', mountedSourcePath),
+    )
+    await runRandomizerStep(debug, 'write-source-rom-file', () =>
+      window.cjCall!('com.dabomstew.pkrandom.FileFunctions', 'writeBytesToFile', workingSourcePath, sourceBytes),
+    )
+    const javaRandom = await runRandomizerStep(debug, 'create-java-random', () =>
+      window.cjNew!('java.util.Random'),
+    )
+    const romHandler = await runRandomizerStep(debug, 'create-gen4-rom-handler', () =>
+      window.cjNew!('com.dabomstew.pkrandom.romhandlers.Gen4RomHandler', javaRandom),
+    )
     onStatus?.('Loading the Platinum ROM into the randomizer...')
-    await window.cjCall(romHandler, 'loadRom', workingSourcePath)
+    await runRandomizerStep(debug, 'load-rom-into-randomizer', () =>
+      window.cjCall!(romHandler, 'loadRom', workingSourcePath),
+    )
 
     onStatus?.('Tweaking preset compatibility for Platinum...')
-    await window.cjCall(javaSettings, 'tweakForRom', romHandler)
+    await runRandomizerStep(debug, 'tweak-settings-for-rom', () =>
+      window.cjCall!(javaSettings, 'tweakForRom', romHandler),
+    )
     onStatus?.('Creating the randomizer session...')
-    const randomizer = await window.cjNew('com.dabomstew.pkrandom.Randomizer', javaSettings, romHandler)
+    const randomizer = await runRandomizerStep(debug, 'create-randomizer-session', () =>
+      window.cjNew!('com.dabomstew.pkrandom.Randomizer', javaSettings, romHandler),
+    )
 
     onStatus?.('Generating a fresh randomized Platinum ROM...')
-    await window.cjCall(randomizer, 'randomize', outputPath)
+    await runRandomizerStep(
+      debug,
+      'generate-randomized-rom',
+      () => window.cjCall!(randomizer, 'randomize', outputPath),
+      240000,
+    )
 
-    const fileBlob = await waitForRandomizedFile(outputPath)
+    const fileBlob = await runRandomizerStep(debug, 'read-randomized-rom-output', () =>
+      waitForRandomizedFile(outputPath),
+    )
     const fileData = new Uint8Array(await fileBlob.arrayBuffer())
+    completeRandomizerDebugState(debug)
 
     return {
       fileName: outputFileName,
       fileData,
       presetLabel: presetConfig.label,
     }
+  } catch (error) {
+    recordRandomizerError(error)
+    throw error
   } finally {
     restoreEmulatorHeapGlobals()
   }
@@ -256,6 +321,146 @@ async function waitForClassAvailability(): Promise<void> {
   }
 
   throw new Error('The browser randomizer runtime did not finish loading.')
+}
+
+function createRandomizerDebugState({
+  preset,
+  romName,
+  romBytes,
+}: {
+  preset: RandomizerPresetId
+  romName: string
+  romBytes: number
+}): RandomizerDebugState {
+  const now = new Date().toISOString()
+  const state: RandomizerDebugState = {
+    startedAt: now,
+    updatedAt: now,
+    phase: 'running',
+    currentStep: 'initializing',
+    completedSteps: [],
+    error: null,
+    preset,
+    romName,
+    romBytes,
+    telemetry: readRuntimeTelemetry(),
+  }
+  persistRandomizerDebugState(state)
+  return state
+}
+
+function completeRandomizerDebugState(state: RandomizerDebugState): void {
+  state.phase = 'completed'
+  state.currentStep = 'completed'
+  state.updatedAt = new Date().toISOString()
+  state.telemetry = readRuntimeTelemetry()
+  persistRandomizerDebugState(state)
+}
+
+function recordRandomizerError(error: unknown): void {
+  const existing = readPersistedRandomizerDebugState()
+  if (!existing) {
+    return
+  }
+
+  existing.phase = 'failed'
+  existing.error = error instanceof Error ? error.message : String(error)
+  existing.updatedAt = new Date().toISOString()
+  existing.telemetry = readRuntimeTelemetry()
+  persistRandomizerDebugState(existing)
+}
+
+async function runRandomizerStep<T>(
+  state: RandomizerDebugState,
+  stepName: string,
+  action: () => Promise<T> | T,
+  timeoutMs = 45000,
+): Promise<T> {
+  state.currentStep = stepName
+  state.updatedAt = new Date().toISOString()
+  state.telemetry = readRuntimeTelemetry()
+  persistRandomizerDebugState(state)
+  console.log(`[randomizer] step:start ${stepName}`, state.telemetry)
+
+  try {
+    const result = await withTimeout(action(), timeoutMs, `Timed out during ${stepName}.`)
+    state.completedSteps = [...state.completedSteps, stepName]
+    state.updatedAt = new Date().toISOString()
+    state.telemetry = readRuntimeTelemetry()
+    persistRandomizerDebugState(state)
+    console.log(`[randomizer] step:done ${stepName}`, state.telemetry)
+    return result
+  } catch (error) {
+    state.phase = 'failed'
+    state.error = error instanceof Error ? error.message : String(error)
+    state.updatedAt = new Date().toISOString()
+    state.telemetry = readRuntimeTelemetry()
+    persistRandomizerDebugState(state)
+    console.error(`[randomizer] step:failed ${stepName}`, error)
+    throw error
+  }
+}
+
+function persistRandomizerDebugState(state: RandomizerDebugState): void {
+  window.localStorage.setItem(RANDOMIZER_DEBUG_KEY, JSON.stringify(state))
+}
+
+function readPersistedRandomizerDebugState(): RandomizerDebugState | null {
+  const raw = window.localStorage.getItem(RANDOMIZER_DEBUG_KEY)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw) as RandomizerDebugState
+  } catch {
+    return null
+  }
+}
+
+function readRuntimeTelemetry(): RandomizerDebugState['telemetry'] {
+  const globalWindow = window as Window & {
+    Module?: {
+      HEAP8?: { length?: number }
+    }
+    HEAP8?: { length?: number }
+  }
+  const perfMemory = (performance as Performance & {
+    memory?: {
+      jsHeapSizeLimit?: number
+      usedJSHeapSize?: number
+      totalJSHeapSize?: number
+    }
+  }).memory
+
+  return {
+    moduleHeap8Length: typeof globalWindow.Module?.HEAP8?.length === 'number' ? globalWindow.Module.HEAP8.length : null,
+    windowHeap8Length: typeof globalWindow.HEAP8?.length === 'number'
+      ? globalWindow.HEAP8.length
+      : null,
+    jsHeapLimit: perfMemory?.jsHeapSizeLimit ?? null,
+    usedJsHeapSize: perfMemory?.usedJSHeapSize ?? null,
+    totalJsHeapSize: perfMemory?.totalJSHeapSize ?? null,
+  }
+}
+
+function withTimeout<T>(promise: Promise<T> | T, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(message))
+    }, timeoutMs)
+
+    Promise.resolve(promise).then(
+      (value) => {
+        window.clearTimeout(timeoutId)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timeoutId)
+        reject(error)
+      },
+    )
+  })
 }
 
 async function loadPresetSettings(path: string): Promise<Uint8Array> {
