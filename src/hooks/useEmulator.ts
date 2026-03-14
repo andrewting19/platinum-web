@@ -21,10 +21,7 @@ import {
   syncStorage,
   writeVirtualFile,
 } from '../lib/emulator'
-import { randomizeRom, type RandomizerPresetId } from '../lib/randomizer'
 import type { RememberedRom } from '../lib/emulator'
-
-type ScreenFocus = 'top' | 'bottom'
 
 export interface SessionMeta {
   gameTitle: string
@@ -42,7 +39,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
   const [launching, setLaunching] = useState(false)
   const [paused, setPaused] = useState(false)
   const [fastForward, setFastForward] = useState(false)
-  const [screenFocus, setScreenFocus] = useState<ScreenFocus>('top')
   const [status, setStatus] = useState('Loading the Nintendo DS runtime...')
   const [error, setError] = useState<string | null>(null)
   const [saveBanner, setSaveBanner] = useState('No save activity yet.')
@@ -55,7 +51,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
   const autoResumeAttemptedRef = useRef(false)
   const sdkReadyRef = useRef(sdkReady)
   const storageReadyRef = useRef(storageReady)
-  const startBufferRef = useRef<(fileName: string, fileSize: number, fileData: Uint8Array) => Promise<void>>(null!)
   sdkReadyRef.current = sdkReady
   storageReadyRef.current = storageReady
 
@@ -407,8 +402,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
     }
   }
 
-  startBufferRef.current = startBuffer
-
   const start = async (file: File) => {
     const fileData = new Uint8Array(await file.arrayBuffer())
     await startBuffer(file.name, file.size, fileData, 'Imported ROM')
@@ -443,36 +436,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
       const message = caught instanceof Error ? caught.message : 'Bundled ROM startup failed.'
       setError(message)
       setStatus('The bundled cartridge could not be started.')
-    } finally {
-      setLaunching(false)
-    }
-  }
-
-  const startBundledRandomizedRom = async (preset: RandomizerPresetId) => {
-    setLaunching(true)
-    try {
-      setError(null)
-      const baseRom = await fetchBundledRomBuffer({
-        onProgress: setRomDownloadProgress,
-        onStatus: setStatus,
-      })
-      setStatus('Initializing the Pokemon randomizer...')
-      const randomized = await randomizeRom({
-        romData: baseRom,
-        romName: BUNDLED_ROM_NAME,
-        preset,
-        onStatus: setStatus,
-      })
-      await startBuffer(
-        randomized.fileName,
-        randomized.fileData.byteLength,
-        randomized.fileData,
-        randomized.presetLabel,
-      )
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'Randomizer startup failed.'
-      setError(message)
-      setStatus('The randomized run could not be started.')
     } finally {
       setLaunching(false)
     }
@@ -626,14 +589,12 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
     launching,
     paused,
     fastForward,
-    screenFocus,
     status,
     error,
     saveBanner,
     session,
     rememberedRom,
     romDownloadProgress,
-    setScreenFocus,
     start,
     stop,
     togglePause,
@@ -641,9 +602,7 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
     exportSave,
     importSave,
     startBundledRom,
-    startBundledRandomizedRom,
     startPreparedRom,
-    startFromUrl,
     resumeRememberedRom,
     forgetRememberedRom,
   }

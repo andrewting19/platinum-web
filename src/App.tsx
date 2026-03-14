@@ -16,6 +16,13 @@ import {
   type PendingRandomizedRom,
 } from './lib/launchHandoff'
 import { randomizeRom, RANDOMIZER_PRESETS, type RandomizerPresetId } from './lib/randomizer'
+import {
+  buildCustomSettingsString,
+  loadSavedToggles,
+  PRESET_TOGGLE_MAP,
+  saveToggles,
+  type RandomizerToggles,
+} from './lib/randomizerSettings'
 
 function GearIcon() {
   return (
@@ -188,24 +195,216 @@ type PendingBoot =
   | { kind: 'bundled' }
   | { kind: 'prepared'; payload: PendingRandomizedRom }
 
+function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (value: T) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="segment-group">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          className={`segment-btn${value === option.value ? ' active' : ''}`}
+          disabled={disabled}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SettingsPanel({
+  toggles,
+  onChange,
+  onStart,
+  busy,
+}: {
+  toggles: RandomizerToggles
+  onChange: (toggles: RandomizerToggles) => void
+  onStart: () => void
+  busy: boolean
+}) {
+  const update = <K extends keyof RandomizerToggles>(key: K, value: RandomizerToggles[K]) => {
+    onChange({ ...toggles, [key]: value })
+  }
+
+  const applyPreset = (presetId: string) => {
+    const preset = PRESET_TOGGLE_MAP[presetId]
+    if (preset) {
+      onChange({ ...preset })
+    }
+  }
+
+  return (
+    <div className="settings-panel">
+      <div className="preset-chip-row">
+        {['nuzlocke', 'classic', 'balanced', 'chaos'].map((id) => {
+          const match = PRESET_TOGGLE_MAP[id]
+          const isActive = match && Object.keys(match).every(
+            (k) => match[k as keyof RandomizerToggles] === toggles[k as keyof RandomizerToggles],
+          )
+          return (
+            <button
+              key={id}
+              className={`preset-chip${isActive ? ' active' : ''}`}
+              disabled={busy}
+              onClick={() => applyPreset(id)}
+            >
+              {id === 'nuzlocke' ? 'Nuzlocke' : id.charAt(0).toUpperCase() + id.slice(1)}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Starters</div>
+        <SegmentedControl
+          value={toggles.starters}
+          options={[
+            { value: 'fully-random', label: 'Random' },
+            { value: 'similar-strength', label: 'Balanced' },
+            { value: 'unchanged', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('starters', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Wild Pokemon</div>
+        <SegmentedControl
+          value={toggles.wildPokemon}
+          options={[
+            { value: 'fully-random', label: 'Random' },
+            { value: 'random-per-area', label: 'Per Area' },
+            { value: 'unchanged', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('wildPokemon', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Trainers</div>
+        <SegmentedControl
+          value={toggles.trainers}
+          options={[
+            { value: 'fully-random', label: 'Random' },
+            { value: 'similar-strength', label: 'Balanced' },
+            { value: 'unchanged', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('trainers', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Movesets</div>
+        <SegmentedControl
+          value={toggles.movesets}
+          options={[
+            { value: 'unchanged', label: 'Vanilla' },
+            { value: 'same-type', label: 'Same Type' },
+            { value: 'fully-random', label: 'Random' },
+          ]}
+          onChange={(v) => update('movesets', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Abilities</div>
+        <SegmentedControl
+          value={toggles.abilities}
+          options={[
+            { value: 'random', label: 'Random' },
+            { value: 'unchanged', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('abilities', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Field Items</div>
+        <SegmentedControl
+          value={toggles.fieldItems}
+          options={[
+            { value: 'randomized', label: 'Random' },
+            { value: 'unchanged', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('fieldItems', v)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Move Typing</div>
+        <SegmentedControl
+          value={toggles.randomizeMoveTyping ? 'on' : 'off'}
+          options={[
+            { value: 'off', label: 'Vanilla' },
+            { value: 'on', label: 'Random' },
+          ]}
+          onChange={(v) => update('randomizeMoveTyping', v === 'on')}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-label">Catch Rate</div>
+        <SegmentedControl
+          value={toggles.catchRateBoost ? 'on' : 'off'}
+          options={[
+            { value: 'on', label: 'Boosted' },
+            { value: 'off', label: 'Vanilla' },
+          ]}
+          onChange={(v) => update('catchRateBoost', v === 'on')}
+          disabled={busy}
+        />
+      </div>
+
+      <button className="welcome-btn" disabled={busy} onClick={onStart}>
+        Start Custom Run
+      </button>
+    </div>
+  )
+}
+
 function LauncherScreen({
   status,
   error,
   busy,
   romDownloadProgress,
+  toggles,
+  onToggleChange,
   onVanilla,
   onRandomized,
+  onCustomStart,
   onImportRom,
 }: {
   status: string
   error: string | null
   busy: boolean
   romDownloadProgress: number | null
+  toggles: RandomizerToggles
+  onToggleChange: (toggles: RandomizerToggles) => void
   onVanilla: () => void
   onRandomized: (preset: RandomizerPresetId) => void
+  onCustomStart: () => void
   onImportRom: (file: File) => void
 }) {
   const romInputRef = useRef<HTMLInputElement | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <main className="launcher-shell">
@@ -242,6 +441,21 @@ function LauncherScreen({
               {preset.label}
             </button>
           ))}
+          <button
+            className="welcome-btn ghost"
+            disabled={busy}
+            onClick={() => setSettingsOpen(!settingsOpen)}
+          >
+            {settingsOpen ? 'Hide Settings' : 'Customize & Play'}
+          </button>
+          {settingsOpen ? (
+            <SettingsPanel
+              toggles={toggles}
+              onChange={onToggleChange}
+              onStart={onCustomStart}
+              busy={busy}
+            />
+          ) : null}
           <button
             className="welcome-btn subtle"
             disabled={busy}
@@ -645,6 +859,12 @@ function App() {
   const [status, setStatus] = useState('Checking for a pending randomized run...')
   const [error, setError] = useState<string | null>(null)
   const [romDownloadProgress, setRomDownloadProgress] = useState<number | null>(null)
+  const [randomizerToggles, setRandomizerToggles] = useState<RandomizerToggles>(loadSavedToggles)
+
+  const handleToggleChange = (toggles: RandomizerToggles) => {
+    setRandomizerToggles(toggles)
+    saveToggles(toggles)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -744,6 +964,46 @@ function App() {
     }
   }
 
+  const startCustomRandomizedLaunch = async () => {
+    setMode('randomizing')
+    setError(null)
+
+    try {
+      const baseRom = await fetchBundledRomBuffer({
+        onProgress: setRomDownloadProgress,
+        onStatus: setStatus,
+      })
+      setStatus('Building custom randomizer settings...')
+      const customSettings = await buildCustomSettingsString(randomizerToggles)
+
+      setStatus('Initializing the Pokemon randomizer...')
+      const randomized = await randomizeRom({
+        romData: baseRom,
+        romName: BUNDLED_ROM_NAME,
+        preset: 'balanced',
+        presetLabel: 'Custom Randomizer',
+        settingsOverride: customSettings,
+        onStatus: setStatus,
+      })
+
+      setStatus('Saving the randomized ROM for handoff...')
+      await savePendingRandomizedRom({
+        fileName: randomized.fileName,
+        sourceLabel: randomized.presetLabel,
+        fileData: randomized.fileData,
+      })
+
+      setStatus('Restarting into a clean emulator session...')
+      window.location.reload()
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Custom randomizer startup failed.'
+      setError(message)
+      setStatus('The custom randomized run could not be prepared.')
+      setRomDownloadProgress(null)
+      setMode('launcher')
+    }
+  }
+
   const handlePreparedBootConsumed = () => {
     if (pendingBoot?.kind !== 'prepared') {
       return
@@ -760,8 +1020,11 @@ function App() {
         error={error}
         busy={mode === 'checking' || mode === 'randomizing'}
         romDownloadProgress={romDownloadProgress}
+        toggles={randomizerToggles}
+        onToggleChange={handleToggleChange}
         onVanilla={startVanillaLaunch}
         onRandomized={(preset) => void startRandomizedLaunch(preset)}
+        onCustomStart={() => void startCustomRandomizedLaunch()}
         onImportRom={(file) => void startImportedLaunch(file)}
       />
     )

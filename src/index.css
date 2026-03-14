@@ -626,6 +626,31 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .welcome-btn.subtle { background: rgba(255, 255, 255, 0.04); color: var(--text); border-color: rgba(255, 255, 255, 0.08); font-weight: 500; }
 .welcome-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; width: 100%; max-width: 220px; }
 
+/* Settings panel */
+.settings-panel { display: flex; flex-direction: column; gap: 10px; width: 100%; padding: 12px 0; }
+.preset-chip-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px; }
+.preset-chip {
+  padding: 4px 12px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent; color: var(--text-dim); font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s ease; font-family: var(--font-ui);
+  letter-spacing: 0.02em; text-transform: uppercase;
+}
+.preset-chip:hover { border-color: var(--accent-dim); color: var(--text); }
+.preset-chip.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+.preset-chip:disabled { opacity: 0.4; cursor: default; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.setting-label { font-size: 0.8rem; color: var(--text-dim); font-weight: 500; white-space: nowrap; min-width: 80px; }
+.segment-group { display: flex; gap: 2px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 2px; }
+.segment-btn {
+  padding: 4px 10px; border-radius: 6px; border: none;
+  background: transparent; color: var(--text-dim); font-size: 0.72rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s ease; font-family: var(--font-ui);
+  white-space: nowrap;
+}
+.segment-btn:hover { color: var(--text); }
+.segment-btn.active { background: var(--accent-dim); color: var(--accent); }
+.segment-btn:disabled { opacity: 0.4; cursor: default; }
+
 /* Download progress bar */
 .download-progress { width: 100%; max-width: 220px; margin-top: 8px; }
 .progress-bar { width: 100%; height: 4px; background: var(--shell-light); border-radius: 2px; overflow: hidden; }
