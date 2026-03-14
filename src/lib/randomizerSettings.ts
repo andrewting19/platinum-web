@@ -31,16 +31,6 @@ export const DEFAULT_TOGGLES: RandomizerToggles = {
 
 export const PRESET_TOGGLE_MAP: Record<string, RandomizerToggles> = {
   nuzlocke: { ...DEFAULT_TOGGLES },
-  classic: {
-    starters: 'similar-strength',
-    wildPokemon: 'fully-random',
-    trainers: 'fully-random',
-    movesets: 'same-type',
-    abilities: 'unchanged',
-    fieldItems: 'unchanged',
-    randomizeMoveTyping: false,
-    catchRateBoost: false,
-  },
   balanced: {
     starters: 'similar-strength',
     wildPokemon: 'fully-random',

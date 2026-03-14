@@ -247,7 +247,7 @@ function SettingsPanel({
   return (
     <div className="settings-panel">
       <div className="preset-chip-row">
-        {['nuzlocke', 'classic', 'balanced', 'chaos'].map((id) => {
+        {['nuzlocke', 'balanced', 'chaos'].map((id) => {
           const match = PRESET_TOGGLE_MAP[id]
           const isActive = match && Object.keys(match).every(
             (k) => match[k as keyof RandomizerToggles] === toggles[k as keyof RandomizerToggles],
