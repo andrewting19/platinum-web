@@ -32,7 +32,7 @@ export const RANDOMIZER_PRESETS: RandomizerPreset[] = [
 ]
 
 function getRandomizerJarUrl(): string {
-  return new URL('/randomizer/randomizer.jar', window.location.href).toString()
+  return `${import.meta.env.BASE_URL.replace(/^\//, '')}randomizer/dist/randomizer.jar`
 }
 
 declare global {
@@ -94,12 +94,17 @@ export async function randomizeRom({
   window.cheerpjAddStringFile(sourcePath, romData)
 
   onStatus?.(`Applying ${presetConfig.label}...`)
+  onStatus?.('Loading preset settings...')
   const javaSettings = await loadJavaSettings(presetConfig.settingsString)
+  onStatus?.('Preparing Java randomizer state...')
   const javaRandom = await window.cjNew('java.util.Random')
   const romHandler = await window.cjNew('com.dabomstew.pkrandom.romhandlers.Gen4RomHandler', javaRandom)
+  onStatus?.('Loading the Platinum ROM into the randomizer...')
   await window.cjCall(romHandler, 'loadRom', window.cjStringJsToJava(sourcePath))
 
+  onStatus?.('Tweaking preset compatibility for Platinum...')
   await window.cjCall(javaSettings, 'tweakForRom', romHandler)
+  onStatus?.('Creating the randomizer session...')
   const randomizer = await window.cjNew('com.dabomstew.pkrandom.Randomizer', javaSettings, romHandler)
 
   onStatus?.('Generating a fresh randomized Platinum ROM...')
