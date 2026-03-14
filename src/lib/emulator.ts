@@ -52,8 +52,12 @@ export function ensureWebMelonRuntime(): Promise<void> {
   }
 
   runtimeScriptsPromise = (async () => {
-    await loadRuntimeScript('static/wasmemulator.js', 'wasmemulator')
+    // webmelon.js must load first: it sets window.Module with an
+    // onRuntimeInitialized callback.  wasmemulator.js (Emscripten output)
+    // snapshots whatever Module object exists at parse time, so the callback
+    // must already be in place before the Emscripten script executes.
     await loadRuntimeScript('static/webmelon.js', 'webmelon')
+    await loadRuntimeScript('static/wasmemulator.js', 'wasmemulator')
   })().catch((error) => {
     runtimeScriptsPromise = null
     throw error

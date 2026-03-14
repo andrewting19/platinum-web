@@ -254,8 +254,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
 
     setStatus('Loading the Nintendo DS runtime...')
 
-    let waitForSdk: number | null = null
-
     void ensureWebMelonRuntime()
       .then(() => {
         if (cancelled) {
@@ -267,18 +265,11 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
           return
         }
 
-        waitForSdk = window.setInterval(() => {
-          if (!window.WebMelon?.assembly) {
-            return
-          }
-
-          if (waitForSdk !== null) {
-            window.clearInterval(waitForSdk)
-            waitForSdk = null
-          }
-          window.WebMelon.assembly.addLoadListener(handleRuntimeReady)
-          setStatus('Compiling the Nintendo DS runtime...')
-        }, 40)
+        // webmelon.js loads before wasmemulator.js, so WebMelon.assembly
+        // is guaranteed to exist here.  addLoadListener handles the
+        // already-compiled case internally.
+        setStatus('Compiling the Nintendo DS runtime...')
+        getWebMelon().assembly.addLoadListener(handleRuntimeReady)
       })
       .catch(() => {
         if (cancelled) {
@@ -291,9 +282,6 @@ export function useEmulator({ disableAutoResume = false }: { disableAutoResume?:
 
     return () => {
       cancelled = true
-      if (waitForSdk !== null) {
-        window.clearInterval(waitForSdk)
-      }
       clearSaveTimer()
     }
   }, [setTransientSaveBanner])
