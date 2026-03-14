@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  BUNDLED_ROM_NAME,
   clearRememberedRom,
   deleteVirtualFile,
   deriveRomPath,
   deriveSavePath,
+  ensureWebMelonRuntime,
   ensureBaseDirectories,
+  fetchBundledRomBuffer,
   loadRememberedRom,
   getWebMelon,
   isRuntimeLoaded,
@@ -32,10 +35,7 @@ export interface SessionMeta {
   sourceLabel: string
 }
 
-const BUNDLED_ROM_URL = 'https://pub-96d84523d8a341b79c022b2a33f1c324.r2.dev/pokemon-platinum.nds.gz'
-const BUNDLED_ROM_NAME = 'pokemon-platinum.nds'
-
-export function useEmulator() {
+export function useEmulator({ disableAutoResume = false }: { disableAutoResume?: boolean } = {}) {
   const [sdkReady, setSdkReady] = useState(isRuntimeLoaded())
   const [storageReady, setStorageReady] = useState(false)
   const [running, setRunning] = useState(false)
@@ -191,7 +191,13 @@ export function useEmulator() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+
     const handleRuntimeReady = () => {
+      if (cancelled) {
+        return
+      }
+
       if (bootstrappedRef.current) {
         return
       }
@@ -246,70 +252,51 @@ export function useEmulator() {
         })
     }
 
-    if (isRuntimeLoaded()) {
-      handleRuntimeReady()
-      return
-    }
+    setStatus('Loading the Nintendo DS runtime...')
 
-    const waitForSdk = window.setInterval(() => {
-      if (!window.WebMelon?.assembly) {
-        return
-      }
+    let waitForSdk: number | null = null
 
-      window.clearInterval(waitForSdk)
-      window.WebMelon.assembly.addLoadListener(handleRuntimeReady)
-      setStatus('Compiling the Nintendo DS runtime...')
-    }, 40)
+    void ensureWebMelonRuntime()
+      .then(() => {
+        if (cancelled) {
+          return
+        }
+
+        if (isRuntimeLoaded()) {
+          handleRuntimeReady()
+          return
+        }
+
+        waitForSdk = window.setInterval(() => {
+          if (!window.WebMelon?.assembly) {
+            return
+          }
+
+          if (waitForSdk !== null) {
+            window.clearInterval(waitForSdk)
+            waitForSdk = null
+          }
+          window.WebMelon.assembly.addLoadListener(handleRuntimeReady)
+          setStatus('Compiling the Nintendo DS runtime...')
+        }, 40)
+      })
+      .catch(() => {
+        if (cancelled) {
+          return
+        }
+
+        setError('The Nintendo DS runtime could not be loaded.')
+        setStatus('Runtime loading failed.')
+      })
 
     return () => {
-      window.clearInterval(waitForSdk)
+      cancelled = true
+      if (waitForSdk !== null) {
+        window.clearInterval(waitForSdk)
+      }
       clearSaveTimer()
     }
   }, [setTransientSaveBanner])
-
-  const fetchBundledRomBuffer = async () => {
-    try {
-      setStatus('Downloading Pokemon Platinum...')
-      setRomDownloadProgress(0)
-
-      const response = await fetch(BUNDLED_ROM_URL)
-      if (!response.ok) throw new Error(`Download failed (${response.status})`)
-
-      const contentLength = Number(response.headers.get('Content-Length') || 0)
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('Download stream unavailable')
-
-      const chunks: Uint8Array[] = []
-      let received = 0
-
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value)
-        received += value.byteLength
-        if (contentLength > 0) {
-          setRomDownloadProgress(Math.round((received / contentLength) * 100))
-        }
-      }
-
-      setStatus('Decompressing ROM...')
-      setRomDownloadProgress(null)
-
-      const compressed = new Blob(chunks as BlobPart[])
-      const ds = new DecompressionStream('gzip')
-      const decompressed = compressed.stream().pipeThrough(ds)
-      const decompressedBlob = await new Response(decompressed).blob()
-      return new Uint8Array(await decompressedBlob.arrayBuffer())
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'ROM download failed'
-      setError(message)
-      setStatus('Could not prepare Pokemon Platinum. Use the menu to import manually.')
-      setRomDownloadProgress(null)
-      throw caught
-    } finally {
-      setRomDownloadProgress(null)
-    }
-  }
 
   useEffect(() => {
     const handleBlur = () => {
@@ -459,7 +446,10 @@ export function useEmulator() {
     setLaunching(true)
     try {
       setError(null)
-      const romData = await fetchBundledRomBuffer()
+      const romData = await fetchBundledRomBuffer({
+        onProgress: setRomDownloadProgress,
+        onStatus: setStatus,
+      })
       await startBuffer(BUNDLED_ROM_NAME, romData.byteLength, romData, 'Bundled Pokemon Platinum')
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Bundled ROM startup failed.'
@@ -474,7 +464,10 @@ export function useEmulator() {
     setLaunching(true)
     try {
       setError(null)
-      const baseRom = await fetchBundledRomBuffer()
+      const baseRom = await fetchBundledRomBuffer({
+        onProgress: setRomDownloadProgress,
+        onStatus: setStatus,
+      })
       setStatus('Initializing the Pokemon randomizer...')
       const randomized = await randomizeRom({
         romData: baseRom,
@@ -492,6 +485,24 @@ export function useEmulator() {
       const message = caught instanceof Error ? caught.message : 'Randomizer startup failed.'
       setError(message)
       setStatus('The randomized run could not be started.')
+    } finally {
+      setLaunching(false)
+    }
+  }
+
+  const startPreparedRom = async (
+    fileName: string,
+    fileData: Uint8Array,
+    sourceLabel: string,
+  ) => {
+    setLaunching(true)
+    try {
+      setError(null)
+      await startBuffer(fileName, fileData.byteLength, fileData, sourceLabel)
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Prepared ROM startup failed.'
+      setError(message)
+      setStatus('The prepared cartridge could not be started.')
     } finally {
       setLaunching(false)
     }
@@ -574,6 +585,10 @@ export function useEmulator() {
 
   // Auto-resume only when we already have a concrete source: cached ROM or explicit URL.
   useEffect(() => {
+    if (disableAutoResume) {
+      return
+    }
+
     if (!sdkReady || !storageReady || running) return
     if (autoResumeAttemptedRef.current) return
     autoResumeAttemptedRef.current = true
@@ -589,7 +604,7 @@ export function useEmulator() {
       const romName = params.get('romName') ?? undefined
       void startFromUrl(romUrl, romName)
     }
-  }, [sdkReady, storageReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [disableAutoResume, sdkReady, storageReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const forgetRememberedRom = async () => {
     if (!rememberedRom) {
@@ -602,6 +617,19 @@ export function useEmulator() {
     await syncStorage(false)
     setTransientSaveBanner('Cached ROM removed from this device.')
   }
+
+  useEffect(() => {
+    return () => {
+      clearSaveTimer()
+      detachPointerBridge()
+      detachRuntimeCanvasListeners()
+      detachRuntimeKeyboardListeners()
+      if (window.WebMelon?.emulator.hasEmulator()) {
+        window.WebMelon.emulator.shutdown()
+      }
+      releaseAllButtons()
+    }
+  }, [])
 
   return {
     sdkReady,
@@ -626,6 +654,7 @@ export function useEmulator() {
     importSave,
     startBundledRom,
     startBundledRandomizedRom,
+    startPreparedRom,
     startFromUrl,
     resumeRememberedRom,
     forgetRememberedRom,

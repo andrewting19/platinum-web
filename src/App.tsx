@@ -1,10 +1,21 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEmulator } from './hooks/useEmulator'
-import { formatBytes, pressButton, releaseButton, type DsButton } from './lib/emulator'
-import { RANDOMIZER_PRESETS } from './lib/randomizer'
-
-/* ── Inline SVG icons ── */
+import {
+  BUNDLED_ROM_NAME,
+  fetchBundledRomBuffer,
+  formatBytes,
+  pressButton,
+  releaseButton,
+  type DsButton,
+} from './lib/emulator'
+import {
+  clearPendingRandomizedRom,
+  loadPendingRandomizedRom,
+  savePendingRandomizedRom,
+  type PendingRandomizedRom,
+} from './lib/launchHandoff'
+import { randomizeRom, RANDOMIZER_PRESETS, type RandomizerPresetId } from './lib/randomizer'
 
 function GearIcon() {
   return (
@@ -14,8 +25,6 @@ function GearIcon() {
     </svg>
   )
 }
-
-/* ── Face / D-pad button helper ── */
 
 function GameButton({
   button,
@@ -151,8 +160,6 @@ function DpadCluster() {
   )
 }
 
-/* ── Shoulder button helper ── */
-
 function ShoulderButton({ button, label }: { button: DsButton; label: string }) {
   const begin = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.preventDefault()
@@ -177,11 +184,104 @@ function ShoulderButton({ button, label }: { button: DsButton; label: string }) 
   )
 }
 
-/* ── Main App ── */
+type PendingBoot =
+  | { kind: 'bundled' }
+  | { kind: 'prepared'; payload: PendingRandomizedRom }
 
-function App() {
+function LauncherScreen({
+  status,
+  error,
+  busy,
+  romDownloadProgress,
+  onVanilla,
+  onRandomized,
+  onImportRom,
+}: {
+  status: string
+  error: string | null
+  busy: boolean
+  romDownloadProgress: number | null
+  onVanilla: () => void
+  onRandomized: (preset: RandomizerPresetId) => void
+  onImportRom: (file: File) => void
+}) {
+  const romInputRef = useRef<HTMLInputElement | null>(null)
+
+  return (
+    <main className="launcher-shell">
+      <div className="launcher-panel">
+        <div className="launcher-kicker">Platinum Web</div>
+        <h1 className="launcher-title">Pokemon Platinum in your browser</h1>
+        <p className="launcher-copy">
+          Vanilla boots directly. Randomized runs are generated first, then reopened in a clean emulator session.
+        </p>
+
+        {romDownloadProgress !== null ? (
+          <div className="download-progress">
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${romDownloadProgress}%` }} />
+            </div>
+            <div className="progress-label">Downloading... {romDownloadProgress}%</div>
+          </div>
+        ) : null}
+
+        <div className="launcher-status">{status}</div>
+        {error ? <div className="error-toast launcher-error">{error}</div> : null}
+
+        <div className="launcher-actions">
+          <button className="welcome-btn" disabled={busy} onClick={onVanilla}>
+            Play Vanilla
+          </button>
+          {RANDOMIZER_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              className="welcome-btn ghost"
+              disabled={busy}
+              onClick={() => onRandomized(preset.id)}
+            >
+              {preset.label}
+            </button>
+          ))}
+          <button
+            className="welcome-btn subtle"
+            disabled={busy}
+            onClick={() => romInputRef.current?.click()}
+          >
+            Import Your Own ROM
+          </button>
+        </div>
+      </div>
+
+      <input
+        ref={romInputRef}
+        className="hidden-input"
+        type="file"
+        accept=".nds"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) {
+            onImportRom(file)
+          }
+          event.currentTarget.value = ''
+        }}
+      />
+    </main>
+  )
+}
+
+function EmulatorShell({
+  initialBoot,
+  onPreparedBootConsumed,
+  onRequestRandomizedLaunch,
+}: {
+  initialBoot: PendingBoot | null
+  onPreparedBootConsumed: () => void
+  onRequestRandomizedLaunch: (preset: RandomizerPresetId) => void
+}) {
   const romInputRef = useRef<HTMLInputElement | null>(null)
   const saveInputRef = useRef<HTMLInputElement | null>(null)
+  const autoBootRef = useRef(false)
+  const preparedBootClearedRef = useRef(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [controlScale, setControlScale] = useState(() => {
     const saved = window.localStorage.getItem('pokemon:control-scale')
@@ -212,10 +312,10 @@ function App() {
     exportSave,
     importSave,
     startBundledRom,
-    startBundledRandomizedRom,
+    startPreparedRom,
     resumeRememberedRom,
     forgetRememberedRom,
-  } = useEmulator()
+  } = useEmulator({ disableAutoResume: Boolean(initialBoot) })
 
   useEffect(() => {
     window.localStorage.setItem('pokemon:control-scale', String(controlScale))
@@ -225,7 +325,34 @@ function App() {
     window.localStorage.setItem('pokemon:control-opacity', String(controlOpacity))
   }, [controlOpacity])
 
-  // LED status
+  useEffect(() => {
+    if (!initialBoot || autoBootRef.current || !sdkReady || !storageReady || launching) {
+      return
+    }
+
+    autoBootRef.current = true
+
+    if (initialBoot.kind === 'bundled') {
+      void startBundledRom()
+      return
+    }
+
+    void startPreparedRom(
+      initialBoot.payload.fileName,
+      initialBoot.payload.fileData,
+      initialBoot.payload.sourceLabel,
+    )
+  }, [initialBoot, launching, sdkReady, startBundledRom, startPreparedRom, storageReady])
+
+  useEffect(() => {
+    if (!running || preparedBootClearedRef.current || initialBoot?.kind !== 'prepared') {
+      return
+    }
+
+    preparedBootClearedRef.current = true
+    onPreparedBootConsumed()
+  }, [initialBoot, onPreparedBootConsumed, running])
+
   const ledClass = useMemo(() => {
     if (error) return 'status-led error'
     if (running) return 'status-led live'
@@ -233,11 +360,11 @@ function App() {
     return 'status-led'
   }, [error, running, sdkReady, storageReady])
 
-  // Save banner visibility
   const showSaveBanner = saveBanner !== 'No save activity yet.' && saveBanner !== 'Save storage is idle.'
-
-  const showWelcome = !running
-  const canLaunch = sdkReady && storageReady && !launching && romDownloadProgress === null
+  const beginRandomizedLaunch = (preset: RandomizerPresetId) => {
+    stop()
+    onRequestRandomizedLaunch(preset)
+  }
 
   return (
     <main
@@ -249,14 +376,13 @@ function App() {
         } as CSSProperties
       }
     >
-      {/* ── Top clamshell half ── */}
       <div className="top-shell">
         <div className="shoulder-bar">
           <ShoulderButton button="L" label="L" />
           <ShoulderButton button="R" label="R" />
         </div>
         <div className="screen-bezel top-bezel">
-          {showWelcome && (
+          {!running ? (
             <div className="welcome-overlay">
               <div className="welcome-title">Platinum Web</div>
               <div className="welcome-sub">Nintendo DS in your browser</div>
@@ -273,7 +399,7 @@ function App() {
                   <div className="welcome-actions">
                     <button
                       className="welcome-btn"
-                      disabled={!canLaunch}
+                      disabled={!sdkReady || !storageReady || launching}
                       onClick={() => void startBundledRom()}
                     >
                       Play Vanilla
@@ -282,8 +408,8 @@ function App() {
                       <button
                         key={preset.id}
                         className="welcome-btn ghost"
-                        disabled={!canLaunch}
-                        onClick={() => void startBundledRandomizedRom(preset.id)}
+                        disabled={launching}
+                        onClick={() => beginRandomizedLaunch(preset.id)}
                       >
                         {preset.label}
                       </button>
@@ -299,17 +425,15 @@ function App() {
                 </>
               )}
             </div>
-          )}
+          ) : null}
           <canvas id="top-screen" width="256" height="192" />
         </div>
       </div>
 
-      {/* ── Hinge ── */}
       <div className="hinge">
         <div className={ledClass} />
       </div>
 
-      {/* ── Bottom clamshell half ── */}
       <div className="bottom-shell">
         <div className="dpad-section">
           <DpadCluster />
@@ -340,7 +464,6 @@ function App() {
         </div>
       </div>
 
-      {/* Menu toggle button */}
       <button
         className={`menu-toggle ${drawerOpen ? 'open' : ''}`}
         onClick={() => setDrawerOpen(!drawerOpen)}
@@ -348,18 +471,15 @@ function App() {
         <GearIcon />
       </button>
 
-      {/* Drawer backdrop */}
       <div
         className={`drawer-backdrop ${drawerOpen ? 'visible' : ''}`}
         onClick={() => setDrawerOpen(false)}
       />
 
-      {/* Settings / Actions drawer */}
       <div className={`drawer ${drawerOpen ? 'open' : ''}`}>
         <div className="drawer-handle" />
 
-        {/* Session info */}
-        {session && (
+        {session ? (
           <div className="drawer-section">
             <div className="drawer-label">Now Playing</div>
             <div className="session-info">
@@ -381,9 +501,8 @@ function App() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* Playback */}
         <div className="drawer-section">
           <div className="drawer-label">Playback</div>
           <div className="playback-row">
@@ -401,25 +520,16 @@ function App() {
             >
               {fastForward ? '1x' : '2x'}
             </button>
-            <button
-              className="playback-btn"
-              disabled={!running}
-              onClick={() => stop()}
-            >
+            <button className="playback-btn" disabled={!running} onClick={() => stop()}>
               Stop
             </button>
           </div>
         </div>
 
-        {/* Cartridge */}
         <div className="drawer-section">
           <div className="drawer-label">Cartridge</div>
           <div className="drawer-actions">
-            <button
-              className="drawer-btn primary"
-              disabled={launching}
-              onClick={() => void startBundledRom()}
-            >
+            <button className="drawer-btn primary" disabled={launching} onClick={() => void startBundledRom()}>
               Play Vanilla
             </button>
             {RANDOMIZER_PRESETS.map((preset) => (
@@ -427,56 +537,35 @@ function App() {
                 key={preset.id}
                 className="drawer-btn"
                 disabled={launching}
-                onClick={() => void startBundledRandomizedRom(preset.id)}
+                onClick={() => beginRandomizedLaunch(preset.id)}
               >
                 {preset.label}
               </button>
             ))}
-            <button
-              className="drawer-btn"
-              onClick={() => romInputRef.current?.click()}
-            >
+            <button className="drawer-btn" onClick={() => romInputRef.current?.click()}>
               Import ROM
             </button>
-            <button
-              className="drawer-btn"
-              disabled={!rememberedRom || running}
-              onClick={() => resumeRememberedRom()}
-            >
+            <button className="drawer-btn" disabled={!rememberedRom || running} onClick={() => resumeRememberedRom()}>
               Resume Cached
             </button>
-            <button
-              className="drawer-btn danger"
-              disabled={!rememberedRom}
-              onClick={() => void forgetRememberedRom()}
-            >
+            <button className="drawer-btn danger" disabled={!rememberedRom} onClick={() => void forgetRememberedRom()}>
               Forget Cached
             </button>
           </div>
         </div>
 
-        {/* Saves */}
         <div className="drawer-section">
           <div className="drawer-label">Save Data</div>
           <div className="drawer-actions">
-            <button
-              className="drawer-btn"
-              disabled={!session}
-              onClick={() => exportSave()}
-            >
+            <button className="drawer-btn" disabled={!session} onClick={() => exportSave()}>
               Export Save
             </button>
-            <button
-              className="drawer-btn"
-              disabled={!session}
-              onClick={() => saveInputRef.current?.click()}
-            >
+            <button className="drawer-btn" disabled={!session} onClick={() => saveInputRef.current?.click()}>
               Import Save
             </button>
           </div>
         </div>
 
-        {/* Tuning */}
         <div className="drawer-section">
           <div className="drawer-label">Controls</div>
           <div className="slider-row">
@@ -505,7 +594,6 @@ function App() {
           </div>
         </div>
 
-        {/* Info */}
         <div className="drawer-section">
           <div className="drawer-label">Keyboard</div>
           <div className="session-info">
@@ -519,17 +607,12 @@ function App() {
         </div>
       </div>
 
-      {/* Save toast */}
       <div className={`save-toast ${showSaveBanner ? 'visible' : ''}`}>
         {saveBanner}
       </div>
 
-      {/* Error toast */}
-      {error && (
-        <div className="error-toast">{error}</div>
-      )}
+      {error ? <div className="error-toast">{error}</div> : null}
 
-      {/* Hidden file inputs */}
       <input
         ref={romInputRef}
         className="hidden-input"
@@ -553,6 +636,143 @@ function App() {
         }}
       />
     </main>
+  )
+}
+
+function App() {
+  const [mode, setMode] = useState<'checking' | 'launcher' | 'randomizing' | 'emulator'>('checking')
+  const [pendingBoot, setPendingBoot] = useState<PendingBoot | null>(null)
+  const [status, setStatus] = useState('Checking for a pending randomized run...')
+  const [error, setError] = useState<string | null>(null)
+  const [romDownloadProgress, setRomDownloadProgress] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const pendingRandomizedRom = await loadPendingRandomizedRom()
+        if (cancelled) {
+          return
+        }
+
+        if (pendingRandomizedRom) {
+          setPendingBoot({ kind: 'prepared', payload: pendingRandomizedRom })
+          setStatus('Restarted into a clean emulator session.')
+          setMode('emulator')
+          return
+        }
+
+        setStatus('Choose a play mode.')
+        setMode('launcher')
+      } catch (caught) {
+        if (cancelled) {
+          return
+        }
+
+        const message = caught instanceof Error ? caught.message : 'Could not restore the pending launch state.'
+        setError(message)
+        setStatus('Pending run recovery failed. You can still start a new session.')
+        setMode('launcher')
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const startVanillaLaunch = () => {
+    setPendingBoot({ kind: 'bundled' })
+    setMode('emulator')
+  }
+
+  const startImportedLaunch = async (file: File) => {
+    try {
+      setError(null)
+      setStatus('Preparing imported ROM...')
+      const fileData = new Uint8Array(await file.arrayBuffer())
+      setPendingBoot({
+        kind: 'prepared',
+        payload: {
+          fileName: file.name,
+          sourceLabel: 'Imported ROM',
+          fileData,
+        },
+      })
+      setMode('emulator')
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Imported ROM startup failed.'
+      setError(message)
+      setStatus('The imported ROM could not be prepared.')
+      setMode('launcher')
+    }
+  }
+
+  const startRandomizedLaunch = async (preset: RandomizerPresetId) => {
+    setMode('randomizing')
+    setError(null)
+
+    try {
+      const baseRom = await fetchBundledRomBuffer({
+        onProgress: setRomDownloadProgress,
+        onStatus: setStatus,
+      })
+      setStatus('Initializing the Pokemon randomizer...')
+      const randomized = await randomizeRom({
+        romData: baseRom,
+        romName: BUNDLED_ROM_NAME,
+        preset,
+        onStatus: setStatus,
+      })
+
+      setStatus('Saving the randomized ROM for handoff...')
+      await savePendingRandomizedRom({
+        fileName: randomized.fileName,
+        sourceLabel: randomized.presetLabel,
+        fileData: randomized.fileData,
+      })
+
+      setStatus('Restarting into a clean emulator session...')
+      window.location.reload()
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Randomizer startup failed.'
+      setError(message)
+      setStatus('The randomized run could not be prepared.')
+      setRomDownloadProgress(null)
+      setMode('launcher')
+    }
+  }
+
+  const handlePreparedBootConsumed = () => {
+    if (pendingBoot?.kind !== 'prepared') {
+      return
+    }
+
+    void clearPendingRandomizedRom()
+    setPendingBoot(null)
+  }
+
+  if (mode !== 'emulator') {
+    return (
+      <LauncherScreen
+        status={status}
+        error={error}
+        busy={mode === 'checking' || mode === 'randomizing'}
+        romDownloadProgress={romDownloadProgress}
+        onVanilla={startVanillaLaunch}
+        onRandomized={(preset) => void startRandomizedLaunch(preset)}
+        onImportRom={(file) => void startImportedLaunch(file)}
+      />
+    )
+  }
+
+  return (
+    <EmulatorShell
+      initialBoot={pendingBoot}
+      onPreparedBootConsumed={handlePreparedBootConsumed}
+      onRequestRandomizedLaunch={(preset) => void startRandomizedLaunch(preset)}
+    />
   )
 }
 

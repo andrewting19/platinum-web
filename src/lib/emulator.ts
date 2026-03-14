@@ -28,6 +28,10 @@ export interface RememberedRom {
 export const ROM_DIRECTORY = '/roms'
 export const SAVE_DIRECTORY = '/savefiles'
 export const LAST_ROM_STORAGE_KEY = 'pokemon:last-rom'
+export const BUNDLED_ROM_URL = 'https://pub-96d84523d8a341b79c022b2a33f1c324.r2.dev/pokemon-platinum.nds.gz'
+export const BUNDLED_ROM_NAME = 'pokemon-platinum.nds'
+
+let runtimeScriptsPromise: Promise<void> | null = null
 
 export function getWebMelon(): WebMelonInterface {
   if (!window.WebMelon) {
@@ -35,6 +39,52 @@ export function getWebMelon(): WebMelonInterface {
   }
 
   return window.WebMelon
+}
+
+export function ensureWebMelonRuntime(): Promise<void> {
+  const runtimeWindow = window as Window & { Module?: unknown }
+  if (window.WebMelon && runtimeWindow.Module) {
+    return Promise.resolve()
+  }
+
+  if (runtimeScriptsPromise) {
+    return runtimeScriptsPromise
+  }
+
+  runtimeScriptsPromise = (async () => {
+    await loadRuntimeScript('static/wasmemulator.js', 'wasmemulator')
+    await loadRuntimeScript('static/webmelon.js', 'webmelon')
+  })().catch((error) => {
+    runtimeScriptsPromise = null
+    throw error
+  })
+
+  return runtimeScriptsPromise
+}
+
+function loadRuntimeScript(relativePath: string, key: string): Promise<void> {
+  const runtimeWindow = window as Window & { Module?: unknown }
+  const existing = document.querySelector<HTMLScriptElement>(`script[data-runtime-script="${key}"]`)
+  if (existing) {
+    if ((key === 'wasmemulator' && runtimeWindow.Module) || (key === 'webmelon' && window.WebMelon)) {
+      return Promise.resolve()
+    }
+
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => reject(new Error(`Could not load ${relativePath}.`)), { once: true })
+    })
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = `${import.meta.env.BASE_URL}${relativePath}`.replace(/\/{2,}/g, '/')
+    script.async = false
+    script.dataset.runtimeScript = key
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error(`Could not load ${relativePath}.`))
+    document.body.appendChild(script)
+  })
 }
 
 export function sanitizeStem(value: string): string {
@@ -132,18 +182,80 @@ export function resumeAudioContext(): Promise<void> | void {
 }
 
 export function pressButton(button: DsButton): void {
+  if (!window.WebMelon?._internal) {
+    return
+  }
+
   const wm = getWebMelon()
   wm._internal.emulatorButtonInput |= wm.constants.DS_INPUT_MAP[button]
 }
 
 export function releaseButton(button: DsButton): void {
+  if (!window.WebMelon?._internal) {
+    return
+  }
+
   const wm = getWebMelon()
   wm._internal.emulatorButtonInput &= ~wm.constants.DS_INPUT_MAP[button] & 0xfff
 }
 
 export function releaseAllButtons(): void {
+  if (!window.WebMelon?._internal) {
+    return
+  }
+
   const wm = getWebMelon()
   wm._internal.emulatorButtonInput = 0
+}
+
+export async function fetchBundledRomBuffer({
+  onProgress,
+  onStatus,
+}: {
+  onProgress?: (progress: number | null) => void
+  onStatus?: (message: string) => void
+} = {}): Promise<Uint8Array> {
+  onStatus?.('Downloading Pokemon Platinum...')
+  onProgress?.(0)
+
+  const response = await fetch(BUNDLED_ROM_URL, { cache: 'no-store' })
+  if (!response.ok) {
+    onProgress?.(null)
+    throw new Error(`Download failed (${response.status})`)
+  }
+
+  const contentLength = Number(response.headers.get('Content-Length') || 0)
+  const reader = response.body?.getReader()
+  if (!reader) {
+    onProgress?.(null)
+    throw new Error('Download stream unavailable')
+  }
+
+  const chunks: Uint8Array[] = []
+  let received = 0
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+
+    chunks.push(value)
+    received += value.byteLength
+
+    if (contentLength > 0) {
+      onProgress?.(Math.round((received / contentLength) * 100))
+    }
+  }
+
+  onStatus?.('Decompressing ROM...')
+  onProgress?.(null)
+
+  const compressed = new Blob(chunks as BlobPart[])
+  const ds = new DecompressionStream('gzip')
+  const decompressed = compressed.stream().pipeThrough(ds)
+  const decompressedBlob = await new Response(decompressed).blob()
+  return new Uint8Array(await decompressedBlob.arrayBuffer())
 }
 
 export function saveFileExists(path: string): boolean {

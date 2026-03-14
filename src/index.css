@@ -58,6 +58,65 @@ label, .status-text, .welcome-title, .welcome-sub, .drawer-label, .session-info,
 canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #000; }
 .hidden-input { display: none; }
 
+.launcher-shell {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 18px;
+  background:
+    radial-gradient(circle at top, rgba(79, 195, 247, 0.16), transparent 32%),
+    linear-gradient(180deg, #171a1f 0%, #0f1217 100%);
+}
+
+.launcher-panel {
+  width: min(100%, 440px);
+  padding: 28px 22px;
+  border-radius: 24px;
+  background: rgba(12, 14, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.4);
+}
+
+.launcher-kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.launcher-title {
+  margin-top: 10px;
+  font-size: clamp(2rem, 7vw, 2.8rem);
+  line-height: 0.95;
+}
+
+.launcher-copy {
+  margin-top: 14px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.launcher-status {
+  margin-top: 18px;
+  min-height: 24px;
+  color: var(--text);
+}
+
+.launcher-error {
+  position: static;
+  margin-top: 12px;
+}
+
+.launcher-actions {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ========================================
    DSi SHELL — main flex container
    ======================================== */
