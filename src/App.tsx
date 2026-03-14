@@ -5,6 +5,7 @@ import {
   BUNDLED_ROM_NAME,
   fetchBundledRomBuffer,
   formatBytes,
+  loadRememberedRom,
   pressButton,
   releaseButton,
   type DsButton,
@@ -15,7 +16,7 @@ import {
   savePendingRandomizedRom,
   type PendingRandomizedRom,
 } from './lib/launchHandoff'
-import { randomizeRom, RANDOMIZER_PRESETS, type RandomizerPresetId } from './lib/randomizer'
+import { randomizeRom } from './lib/randomizer'
 import {
   buildCustomSettingsString,
   loadSavedToggles,
@@ -390,6 +391,7 @@ function LauncherScreen({
   onVanilla,
   onCustomStart,
   onImportRom,
+  initialSettingsOpen = false,
 }: {
   status: string
   error: string | null
@@ -400,9 +402,10 @@ function LauncherScreen({
   onVanilla: () => void
   onCustomStart: () => void
   onImportRom: (file: File) => void
+  initialSettingsOpen?: boolean
 }) {
   const romInputRef = useRef<HTMLInputElement | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
 
   return (
     <main className="launcher-shell">
@@ -474,11 +477,11 @@ function LauncherScreen({
 function EmulatorShell({
   initialBoot,
   onPreparedBootConsumed,
-  onRequestRandomizedLaunch,
+  onReturnToLauncher,
 }: {
   initialBoot: PendingBoot | null
   onPreparedBootConsumed: () => void
-  onRequestRandomizedLaunch: (preset: RandomizerPresetId) => void
+  onReturnToLauncher: () => void
 }) {
   const romInputRef = useRef<HTMLInputElement | null>(null)
   const saveInputRef = useRef<HTMLInputElement | null>(null)
@@ -563,10 +566,6 @@ function EmulatorShell({
   }, [error, running, sdkReady, storageReady])
 
   const showSaveBanner = saveBanner !== 'No save activity yet.' && saveBanner !== 'Save storage is idle.'
-  const beginRandomizedLaunch = (preset: RandomizerPresetId) => {
-    stop()
-    onRequestRandomizedLaunch(preset)
-  }
 
   return (
     <main
@@ -606,16 +605,13 @@ function EmulatorShell({
                     >
                       Play Vanilla
                     </button>
-                    {RANDOMIZER_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        className="welcome-btn ghost"
-                        disabled={launching}
-                        onClick={() => beginRandomizedLaunch(preset.id)}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                    <button
+                      className="welcome-btn ghost"
+                      disabled={launching}
+                      onClick={onReturnToLauncher}
+                    >
+                      New Randomized Run
+                    </button>
                     <button
                       className="welcome-btn subtle"
                       disabled={launching}
@@ -734,16 +730,9 @@ function EmulatorShell({
             <button className="drawer-btn primary" disabled={launching} onClick={() => void startBundledRom()}>
               Play Vanilla
             </button>
-            {RANDOMIZER_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                className="drawer-btn"
-                disabled={launching}
-                onClick={() => beginRandomizedLaunch(preset.id)}
-              >
-                {preset.label}
-              </button>
-            ))}
+            <button className="drawer-btn" onClick={onReturnToLauncher}>
+              New Randomized Run
+            </button>
             <button className="drawer-btn" onClick={() => romInputRef.current?.click()}>
               Import ROM
             </button>
@@ -848,6 +837,14 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [romDownloadProgress, setRomDownloadProgress] = useState<number | null>(null)
   const [randomizerToggles, setRandomizerToggles] = useState<RandomizerToggles>(loadSavedToggles)
+  const [initialSettingsOpen, setInitialSettingsOpen] = useState(false)
+
+  const returnToLauncher = () => {
+    setInitialSettingsOpen(true)
+    setMode('launcher')
+    setStatus('Choose a play mode.')
+    setError(null)
+  }
 
   const handleToggleChange = (toggles: RandomizerToggles) => {
     setRandomizerToggles(toggles)
@@ -867,6 +864,13 @@ function App() {
         if (pendingRandomizedRom) {
           setPendingBoot({ kind: 'prepared', payload: pendingRandomizedRom })
           setStatus('Restarted into a clean emulator session.')
+          setMode('emulator')
+          return
+        }
+
+        const cached = loadRememberedRom()
+        if (cached) {
+          setStatus('Resuming cached session...')
           setMode('emulator')
           return
         }
@@ -913,41 +917,6 @@ function App() {
       const message = caught instanceof Error ? caught.message : 'Imported ROM startup failed.'
       setError(message)
       setStatus('The imported ROM could not be prepared.')
-      setMode('launcher')
-    }
-  }
-
-  const startRandomizedLaunch = async (preset: RandomizerPresetId) => {
-    setMode('randomizing')
-    setError(null)
-
-    try {
-      const baseRom = await fetchBundledRomBuffer({
-        onProgress: setRomDownloadProgress,
-        onStatus: setStatus,
-      })
-      setStatus('Initializing the Pokemon randomizer...')
-      const randomized = await randomizeRom({
-        romData: baseRom,
-        romName: BUNDLED_ROM_NAME,
-        preset,
-        onStatus: setStatus,
-      })
-
-      setStatus('Saving the randomized ROM for handoff...')
-      await savePendingRandomizedRom({
-        fileName: randomized.fileName,
-        sourceLabel: randomized.presetLabel,
-        fileData: randomized.fileData,
-      })
-
-      setStatus('Restarting into a clean emulator session...')
-      window.location.reload()
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'Randomizer startup failed.'
-      setError(message)
-      setStatus('The randomized run could not be prepared.')
-      setRomDownloadProgress(null)
       setMode('launcher')
     }
   }
@@ -1013,6 +982,7 @@ function App() {
         onVanilla={startVanillaLaunch}
         onCustomStart={() => void startCustomRandomizedLaunch()}
         onImportRom={(file) => void startImportedLaunch(file)}
+        initialSettingsOpen={initialSettingsOpen}
       />
     )
   }
@@ -1021,7 +991,7 @@ function App() {
     <EmulatorShell
       initialBoot={pendingBoot}
       onPreparedBootConsumed={handlePreparedBootConsumed}
-      onRequestRandomizedLaunch={(preset) => void startRandomizedLaunch(preset)}
+      onReturnToLauncher={returnToLauncher}
     />
   )
 }
