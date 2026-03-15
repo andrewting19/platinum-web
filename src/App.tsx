@@ -666,29 +666,13 @@ function EmulatorShell({
               ) : (
                 <>
                   <div className="welcome-sub">{status}</div>
-                  <div className="welcome-actions">
-                    <button
-                      className="welcome-btn"
-                      disabled={!sdkReady || !storageReady || launching}
-                      onClick={() => void startBundledRom()}
-                    >
-                      Play Vanilla
-                    </button>
-                    <button
-                      className="welcome-btn ghost"
-                      disabled={launching}
-                      onClick={onReturnToLauncher}
-                    >
-                      New Randomized Run
-                    </button>
-                    <button
-                      className="welcome-btn subtle"
-                      disabled={launching}
-                      onClick={() => romInputRef.current?.click()}
-                    >
-                      Import Your Own ROM
-                    </button>
-                  </div>
+                  {sdkReady && storageReady && !launching ? (
+                    <div className="welcome-actions">
+                      <button className="welcome-btn" onClick={onReturnToLauncher}>
+                        Back to Menu
+                      </button>
+                    </div>
+                  ) : null}
                 </>
               )}
             </div>
@@ -794,19 +778,8 @@ function EmulatorShell({
         </div>
 
         <div className="drawer-section">
-          <div className="drawer-label">Cartridge</div>
+          <div className="drawer-label">Session</div>
           <div className="drawer-actions">
-            <button
-              className="drawer-btn primary"
-              disabled={launching}
-              onClick={() => {
-                if (!running || window.confirm('This will end your current session. Make sure you have saved in-game first.')) {
-                  void startBundledRom()
-                }
-              }}
-            >
-              Play Vanilla
-            </button>
             <button
               className="drawer-btn"
               onClick={() => {
@@ -815,10 +788,7 @@ function EmulatorShell({
                 }
               }}
             >
-              New Randomized Run
-            </button>
-            <button className="drawer-btn" onClick={() => romInputRef.current?.click()}>
-              Import ROM
+              Back to Menu
             </button>
           </div>
         </div>
