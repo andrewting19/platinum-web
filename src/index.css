@@ -149,6 +149,9 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   background: var(--shell);
   position: relative;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .dsi-shell::before {
@@ -328,6 +331,7 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
   width: calc(120px * var(--control-scale));
   height: calc(120px * var(--control-scale));
   flex-shrink: 0;
+  touch-action: none;
 }
 
 .dpad-cross { position: absolute; inset: 0; }

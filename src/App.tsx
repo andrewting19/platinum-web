@@ -163,7 +163,6 @@ function DpadCluster() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
-      onPointerLeave={onPointerEnd}
     >
       <div className="dpad-cross" />
       <div className="dpad-center" />
