@@ -255,7 +255,7 @@ function SettingsPanel({
   return (
     <div className="settings-panel">
       <div className="preset-chip-row">
-        {['nuzlocke', 'balanced', 'chaos'].map((id) => {
+        {(['nuzlocke', 'balanced', 'chaos'] as const).map((id) => {
           const match = PRESET_TOGGLE_MAP[id]
           const isActive = match && Object.keys(match).every(
             (k) => match[k as keyof RandomizerToggles] === toggles[k as keyof RandomizerToggles],
@@ -273,115 +273,96 @@ function SettingsPanel({
         })}
       </div>
 
-      <div className="setting-row">
-        <div className="setting-label">Starters</div>
-        <SegmentedControl
-          value={toggles.starters}
-          options={[
-            { value: 'fully-random', label: 'Random' },
-            { value: 'similar-strength', label: 'Balanced' },
-            { value: 'unchanged', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('starters', v)}
-          disabled={busy}
-        />
+      <div className="settings-group">
+        <div className="setting-row">
+          <div className="setting-label">Starters</div>
+          <SegmentedControl
+            value={toggles.starters}
+            options={[
+              { value: 'fully-random', label: 'Random' },
+              { value: 'similar-strength', label: 'Balanced' },
+              { value: 'unchanged', label: 'Vanilla' },
+            ]}
+            onChange={(v) => update('starters', v)}
+            disabled={busy}
+          />
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">Wild Pokemon</div>
+          <SegmentedControl
+            value={toggles.wildPokemon}
+            options={[
+              { value: 'fully-random', label: 'Random' },
+              { value: 'random-per-area', label: 'Per Area' },
+              { value: 'unchanged', label: 'Vanilla' },
+            ]}
+            onChange={(v) => update('wildPokemon', v)}
+            disabled={busy}
+          />
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">Trainers</div>
+          <SegmentedControl
+            value={toggles.trainers}
+            options={[
+              { value: 'fully-random', label: 'Random' },
+              { value: 'similar-strength', label: 'Balanced' },
+              { value: 'unchanged', label: 'Vanilla' },
+            ]}
+            onChange={(v) => update('trainers', v)}
+            disabled={busy}
+          />
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">Movesets</div>
+          <SegmentedControl
+            value={toggles.movesets}
+            options={[
+              { value: 'unchanged', label: 'Vanilla' },
+              { value: 'same-type', label: 'Same Type' },
+              { value: 'fully-random', label: 'Random' },
+            ]}
+            onChange={(v) => update('movesets', v)}
+            disabled={busy}
+          />
+        </div>
       </div>
 
-      <div className="setting-row">
-        <div className="setting-label">Wild Pokemon</div>
-        <SegmentedControl
-          value={toggles.wildPokemon}
-          options={[
-            { value: 'fully-random', label: 'Random' },
-            { value: 'random-per-area', label: 'Per Area' },
-            { value: 'unchanged', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('wildPokemon', v)}
+      <div className="settings-toggle-grid">
+        <button
+          className={`toggle-pill${toggles.abilities === 'random' ? ' active' : ''}`}
           disabled={busy}
-        />
+          onClick={() => update('abilities', toggles.abilities === 'random' ? 'unchanged' : 'random')}
+        >
+          Abilities
+        </button>
+        <button
+          className={`toggle-pill${toggles.fieldItems === 'randomized' ? ' active' : ''}`}
+          disabled={busy}
+          onClick={() => update('fieldItems', toggles.fieldItems === 'randomized' ? 'unchanged' : 'randomized')}
+        >
+          Field Items
+        </button>
+        <button
+          className={`toggle-pill${toggles.randomizeMoveTyping ? ' active' : ''}`}
+          disabled={busy}
+          onClick={() => update('randomizeMoveTyping', !toggles.randomizeMoveTyping)}
+        >
+          Move Typing
+        </button>
+        <button
+          className={`toggle-pill${toggles.catchRateBoost ? ' active' : ''}`}
+          disabled={busy}
+          onClick={() => update('catchRateBoost', !toggles.catchRateBoost)}
+        >
+          Catch Boost
+        </button>
       </div>
 
-      <div className="setting-row">
-        <div className="setting-label">Trainers</div>
-        <SegmentedControl
-          value={toggles.trainers}
-          options={[
-            { value: 'fully-random', label: 'Random' },
-            { value: 'similar-strength', label: 'Balanced' },
-            { value: 'unchanged', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('trainers', v)}
-          disabled={busy}
-        />
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-label">Movesets</div>
-        <SegmentedControl
-          value={toggles.movesets}
-          options={[
-            { value: 'unchanged', label: 'Vanilla' },
-            { value: 'same-type', label: 'Same Type' },
-            { value: 'fully-random', label: 'Random' },
-          ]}
-          onChange={(v) => update('movesets', v)}
-          disabled={busy}
-        />
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-label">Abilities</div>
-        <SegmentedControl
-          value={toggles.abilities}
-          options={[
-            { value: 'random', label: 'Random' },
-            { value: 'unchanged', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('abilities', v)}
-          disabled={busy}
-        />
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-label">Field Items</div>
-        <SegmentedControl
-          value={toggles.fieldItems}
-          options={[
-            { value: 'randomized', label: 'Random' },
-            { value: 'unchanged', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('fieldItems', v)}
-          disabled={busy}
-        />
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-label">Move Typing</div>
-        <SegmentedControl
-          value={toggles.randomizeMoveTyping ? 'on' : 'off'}
-          options={[
-            { value: 'off', label: 'Vanilla' },
-            { value: 'on', label: 'Random' },
-          ]}
-          onChange={(v) => update('randomizeMoveTyping', v === 'on')}
-          disabled={busy}
-        />
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-label">Catch Rate</div>
-        <SegmentedControl
-          value={toggles.catchRateBoost ? 'on' : 'off'}
-          options={[
-            { value: 'on', label: 'Boosted' },
-            { value: 'off', label: 'Vanilla' },
-          ]}
-          onChange={(v) => update('catchRateBoost', v === 'on')}
-          disabled={busy}
-        />
-      </div>
-
-      <button className="welcome-btn" disabled={busy} onClick={onStart}>
+      <button className="settings-start-btn" disabled={busy} onClick={onStart}>
         Start Custom Run
       </button>
     </div>
