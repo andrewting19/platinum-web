@@ -19,23 +19,18 @@ The intended UX is:
 
 ## Current Status
 
-The project is materially further along than before.
+The randomizer flow is fully working end-to-end on prod. All previous blockers have been resolved.
 
-What is now working:
+What is working:
 
 - the launcher/randomizer flow no longer loads the DS emulator runtime up front
 - CheerpJ randomizer initialization works reliably in the launcher session
 - bundled Platinum randomizer generation completes in-browser
 - the generated randomized ROM is saved for handoff
 - the app reloads into a clean emulator shell after generation
-- the emulator shell detects the pending randomized ROM and starts the boot path
-
-What is still failing:
-
-- after the reload into the emulator shell, the app gets stuck on:
-  `Compiling the Nintendo DS runtime...`
-
-This is the current blocker seen both by the user on prod and in local verification.
+- the emulator shell boots the randomized ROM successfully
+- customizable randomizer settings panel with 8 toggles and preset chips
+- multi-session run management with launcher cards for continuing previous runs
 
 ## What Was Fixed
 
@@ -93,33 +88,13 @@ Not yet verified:
 - successful transition from `Compiling the Nintendo DS runtime...` into live gameplay for the randomized boot path
 - whether this remaining stall is unique to randomized boot or a broader runtime-loader regression in the lazily loaded emulator path
 
-## Current Hypothesis
+## Resolved: Emulator Boot Stall
 
-The randomizer is no longer the main issue.
+The emulator stall at "Compiling the Nintendo DS runtime..." was caused by loading `wasmemulator.js` before `webmelon.js`. Emscripten snapshots `window.Module` at parse time — since `webmelon.js` sets `Module.onRuntimeInitialized`, it must load first so the callback is in place when Emscripten picks it up. Swapping the load order in `ensureWebMelonRuntime()` fixed the issue.
 
-The active problem is now in the emulator runtime boot path after lazy loading. The most likely area is:
+## Resolved: Settings CRC32
 
-- script load / runtime ready signaling in [src/lib/emulator.ts](/workspace/src/lib/emulator.ts) and [src/hooks/useEmulator.ts](/workspace/src/hooks/useEmulator.ts)
-- or a difference between the old eager script boot and the new lazy script boot sequence
-
-In short:
-
-- randomizer generation is green
-- emulator startup after reload is the remaining blocker
-
-## Next Debugging Targets
-
-1. Compare lazy runtime boot versus the old eager `index.html` boot path.
-2. Confirm whether vanilla boot also stalls under the same lazy-loader path in real browser testing.
-3. Add runtime boot instrumentation around:
-   - script load completion
-   - WebMelon assembly listener registration
-   - wasm-loaded signal
-   - storage prep start / finish
-4. Determine whether the compile stall is:
-   - a real wasm compile hang
-   - a missed ready callback
-   - or a UI status that never advances even though the runtime has moved on
+Custom settings byte manipulation initially failed because `findDataLength` assumed a clean 51-byte settings block, but the version migration inserts bytes mid-stream. Fixed by using `data.length` directly for CRC32 computation.
 
 ## Files Most Relevant Right Now
 

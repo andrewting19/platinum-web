@@ -761,10 +761,25 @@ function EmulatorShell({
         <div className="drawer-section">
           <div className="drawer-label">Cartridge</div>
           <div className="drawer-actions">
-            <button className="drawer-btn primary" disabled={launching} onClick={() => void startBundledRom()}>
+            <button
+              className="drawer-btn primary"
+              disabled={launching}
+              onClick={() => {
+                if (!running || window.confirm('This will end your current session. Make sure you have saved in-game first.')) {
+                  void startBundledRom()
+                }
+              }}
+            >
               Play Vanilla
             </button>
-            <button className="drawer-btn" onClick={onReturnToLauncher}>
+            <button
+              className="drawer-btn"
+              onClick={() => {
+                if (!running || window.confirm('This will end your current session. Make sure you have saved in-game first.')) {
+                  onReturnToLauncher()
+                }
+              }}
+            >
               New Randomized Run
             </button>
             <button className="drawer-btn" onClick={() => romInputRef.current?.click()}>
